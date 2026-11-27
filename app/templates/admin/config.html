@@ -1,0 +1,526 @@
+{% extends 'admin/admin_base.html' %}
+{% block title %}System Configuration &amp; Maintenance — Admin Control Center{% endblock %}
+
+{% block breadcrumb_items %}
+    <span class="active-item">System Configuration</span>
+{% endblock %}
+
+{% block admin_content %}
+<!-- Header Bar -->
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+    <div>
+        <h1 class="h3 fw-bold text-white mb-1"><i class="fas fa-sliders me-2 text-primary"></i> System Configuration &amp; Maintenance</h1>
+        <p class="text-muted small mb-0">Centralized SaaS control center for app settings, AI providers, mail server status, maintenance toggles, database backups, and data exports.</p>
+    </div>
+    <div class="d-flex gap-2">
+        <form action="{{ url_for('admin.config_create_backup') }}" method="POST" class="d-inline">
+            <button type="submit" class="btn btn-admin btn-admin-primary btn-admin-sm" onclick="return confirm('Create a timestamped backup copy of smart_study.db now?');">
+                <i class="fas fa-database me-1"></i> Create DB Backup Now
+            </button>
+        </form>
+    </div>
+</div>
+
+<!-- Tab Navigation Bar -->
+<ul class="nav nav-tabs admin-nav-tabs mb-4" id="configTabs" role="tablist" style="border-bottom: 1px solid var(--admin-border);">
+    <li class="nav-item" role="presentation">
+        <button class="nav-link active fw-semibold text-white px-3 py-2" id="general-tab" data-bs-toggle="tab" data-bs-target="#general" type="button" role="tab">
+            <i class="fas fa-cogs me-1 text-primary"></i> General Settings
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link fw-semibold text-white px-3 py-2" id="gemini-tab" data-bs-toggle="tab" data-bs-target="#gemini" type="button" role="tab">
+            <i class="fas fa-robot me-1 text-warning"></i> AI &amp; Gemini
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link fw-semibold text-white px-3 py-2" id="email-tab" data-bs-toggle="tab" data-bs-target="#email" type="button" role="tab">
+            <i class="fas fa-envelope me-1 text-info"></i> Email &amp; SMTP
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link fw-semibold text-white px-3 py-2" id="maintenance-tab" data-bs-toggle="tab" data-bs-target="#maintenance" type="button" role="tab">
+            <i class="fas fa-screwdriver-wrench me-1 text-danger"></i> Maintenance Mode
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link fw-semibold text-white px-3 py-2" id="backups-tab" data-bs-toggle="tab" data-bs-target="#backups" type="button" role="tab">
+            <i class="fas fa-database me-1 text-success"></i> DB Backups
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link fw-semibold text-white px-3 py-2" id="exports-tab" data-bs-toggle="tab" data-bs-target="#exports" type="button" role="tab">
+            <i class="fas fa-file-export me-1 text-primary"></i> Data Export
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link fw-semibold text-white px-3 py-2" id="sysinfo-tab" data-bs-toggle="tab" data-bs-target="#sysinfo" type="button" role="tab">
+            <i class="fas fa-circle-info me-1 text-secondary"></i> System Diagnostics
+        </button>
+    </li>
+</ul>
+
+<!-- Tab Content Container -->
+<div class="tab-content" id="configTabsContent">
+
+    <!-- TAB 1: GENERAL & PLANNER SETTINGS -->
+    <div class="tab-pane fade show active" id="general" role="tabpanel">
+        <div class="row g-4">
+            <div class="col-lg-6">
+                <div class="admin-card h-100 mb-0">
+                    <div class="admin-card-header">
+                        <h2 class="admin-card-title"><i class="fas fa-sliders text-primary"></i> Application General Parameters</h2>
+                    </div>
+                    <form action="{{ url_for('admin.config') }}" method="POST">
+                        <input type="hidden" name="save_general" value="1">
+                        <div class="mb-3">
+                            <label class="form-label text-muted small fw-semibold">Application Name</label>
+                            <input type="text" class="form-control admin-input" value="Smart Study" readonly>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label text-muted small fw-semibold">Runtime Environment</label>
+                            <input type="text" class="form-control admin-input font-mono" value="{{ system_info.flask_env|upper }}" readonly>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label text-muted small fw-semibold">Database Storage Type</label>
+                            <input type="text" class="form-control admin-input" value="{{ system_info.db_type }}" readonly>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label text-muted small fw-semibold">Timezone Context</label>
+                            <input type="text" class="form-control admin-input" value="Asia/Kathmandu (Nepal Standard Time)" readonly>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <div class="col-lg-6">
+                <div class="admin-card h-100 mb-0">
+                    <div class="admin-card-header">
+                        <h2 class="admin-card-title"><i class="fas fa-clock text-info"></i> Study Planner Session Defaults</h2>
+                    </div>
+                    <form action="{{ url_for('admin.config') }}" method="POST">
+                        <div class="mb-3">
+                            <label class="form-label text-muted small fw-semibold">Study Session Duration (Minutes)</label>
+                            <input type="number" name="PLANNER_SESSION_MINUTES" class="form-control admin-input font-mono" value="{{ settings.get('PLANNER_SESSION_MINUTES', '45') }}" required min="15" max="180">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label text-muted small fw-semibold">Break Duration (Minutes)</label>
+                            <input type="number" name="PLANNER_BREAK_MINUTES" class="form-control admin-input font-mono" value="{{ settings.get('PLANNER_BREAK_MINUTES', '10') }}" required min="5" max="60">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label text-muted small fw-semibold">Target Sessions Per Day</label>
+                            <input type="number" name="PLANNER_SESSIONS_PER_DAY" class="form-control admin-input font-mono" value="{{ settings.get('PLANNER_SESSIONS_PER_DAY', '4') }}" required min="1" max="12">
+                        </div>
+                        <div class="text-end mt-4">
+                            <button type="submit" class="btn btn-admin btn-admin-primary btn-admin-sm">
+                                <i class="fas fa-save me-1"></i> Save Planner Defaults
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- TAB 2: AI & GEMINI PROVIDER -->
+    <div class="tab-pane fade" id="gemini" role="tabpanel">
+        <div class="row g-4">
+            <div class="col-lg-8">
+                <div class="admin-card h-100 mb-0">
+                    <div class="admin-card-header">
+                        <h2 class="admin-card-title"><i class="fas fa-robot text-warning"></i> Google Gemini AI Configuration & Safety Budgets</h2>
+                        {% if gemini_config.configured %}
+                        <span class="badge-status active"><i class="fas fa-check"></i> CONFIGURED</span>
+                        {% else %}
+                        <span class="badge-status error"><i class="fas fa-ban"></i> UNCONFIGURED</span>
+                        {% endif %}
+                    </div>
+
+                    <form action="{{ url_for('admin.config') }}" method="POST">
+                        <!-- Mode Selector -->
+                        <div class="mb-4 p-3 rounded" style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1);">
+                            <label class="form-label text-white fw-bold small mb-2"><i class="fas fa-toggle-on text-primary me-1"></i> Active AI Operating Mode</label>
+                            <div class="d-flex gap-4">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="GEMINI_MODE" id="modeFree" value="free" {% if gemini_config.gemini_mode == 'free' %}checked{% endif %}>
+                                    <label class="form-check-label text-white small" for="modeFree">
+                                        <strong>Free Tier Mode</strong> (Uses Free Key & Free Safety Budgets)
+                                    </label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="GEMINI_MODE" id="modePaid" value="paid" {% if gemini_config.gemini_mode == 'paid' %}checked{% endif %}>
+                                    <label class="form-check-label text-white small" for="modePaid">
+                                        <strong>Paid Tier Mode</strong> (Uses Paid Key & Paid Safety Budgets)
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- API Keys Section -->
+                        <div class="mb-3">
+                            <label class="form-label text-muted small fw-semibold">Free Tier Gemini API Key (<code>GEMINI_API_KEY_FREE</code>)</label>
+                            <div class="input-group">
+                                <input type="password" name="GEMINI_API_KEY_FREE" class="form-control admin-input font-mono" value="{{ settings.get('GEMINI_API_KEY_FREE', '') }}" placeholder="Enter Free API Key">
+                                <span class="input-group-text bg-secondary-subtle border-secondary text-muted small font-mono">{{ gemini_config.masked_key_free }}</span>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label text-muted small fw-semibold">Paid Tier Gemini API Key (<code>GEMINI_API_KEY_PAID</code>)</label>
+                            <div class="input-group">
+                                <input type="password" name="GEMINI_API_KEY_PAID" class="form-control admin-input font-mono" value="{{ settings.get('GEMINI_API_KEY_PAID', '') }}" placeholder="Enter Paid API Key">
+                                <span class="input-group-text bg-secondary-subtle border-secondary text-muted small font-mono">{{ gemini_config.masked_key_paid }}</span>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label text-muted small fw-semibold">Legacy Fallback API Key (<code>GEMINI_API_KEY</code>)</label>
+                            <div class="input-group">
+                                <input type="password" name="GEMINI_API_KEY" class="form-control admin-input font-mono" value="{{ settings.get('GEMINI_API_KEY', '') }}" placeholder="Enter Legacy Fallback Key">
+                                <span class="input-group-text bg-secondary-subtle border-secondary text-muted small font-mono">{{ gemini_config.masked_key }}</span>
+                            </div>
+                            <div class="form-text text-dim">Keys are encrypted in memory and masked in all UI views. Never exposed in responses.</div>
+                        </div>
+
+                        <hr class="border-secondary my-4">
+
+                        <!-- Models Section -->
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-4">
+                                <label class="form-label text-muted small fw-semibold">MCQ Generator Model</label>
+                                <input type="text" name="GEMINI_MODEL_MCQ" class="form-control admin-input font-mono" value="{{ gemini_config.mcq_model }}">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label text-muted small fw-semibold">Assistant Primary Model</label>
+                                <input type="text" name="GEMINI_MODEL_ASSISTANT_PRIMARY" class="form-control admin-input font-mono" value="{{ gemini_config.assistant_model }}">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label text-muted small fw-semibold">Assistant Fallback Model</label>
+                                <input type="text" name="GEMINI_MODEL_ASSISTANT_FALLBACK" class="form-control admin-input font-mono" value="{{ gemini_config.fallback_model }}">
+                            </div>
+                        </div>
+
+                        <!-- Safety Budgets Section -->
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label text-muted small fw-semibold">MCQ Daily Budget (Free)</label>
+                                <input type="number" name="GEMINI_DAILY_LIMIT_MCQ" class="form-control admin-input font-mono" value="{{ gemini_config.mcq_daily_limit }}">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label text-muted small fw-semibold">MCQ Daily Budget (Paid)</label>
+                                <input type="number" name="GEMINI_DAILY_LIMIT_MCQ_PAID" class="form-control admin-input font-mono" value="{{ gemini_config.mcq_daily_limit_paid }}">
+                            </div>
+                        </div>
+
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label text-muted small fw-semibold">Assistant Primary Daily Budget (Free)</label>
+                                <input type="number" name="GEMINI_DAILY_LIMIT_ASSISTANT_PRIMARY" class="form-control admin-input font-mono" value="{{ gemini_config.assistant_daily_limit }}">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label text-muted small fw-semibold">Assistant Daily Budget (Paid)</label>
+                                <input type="number" name="GEMINI_DAILY_LIMIT_ASSISTANT_PRIMARY_PAID" class="form-control admin-input font-mono" value="{{ gemini_config.assistant_daily_limit_paid }}">
+                            </div>
+                        </div>
+
+                        <div class="text-end">
+                            <button type="submit" class="btn btn-admin btn-admin-primary btn-admin-sm">
+                                <i class="fas fa-save me-1"></i> Save AI Settings
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <div class="col-lg-4">
+                <div class="admin-card h-100 mb-0">
+                    <div class="admin-card-header">
+                        <h2 class="admin-card-title"><i class="fas fa-plug text-primary"></i> AI Diagnostics</h2>
+                    </div>
+
+                    <div class="p-3 rounded mb-3" style="background: rgba(245, 158, 11, 0.08); border: 1px solid var(--admin-warning);">
+                        <div class="fw-bold text-white small mb-1"><i class="fas fa-triangle-exclamation text-warning me-1"></i> Gemini API Test Tool</div>
+                        <div class="text-dim small">Tests live connectivity to Google Gemini servers using the active mode key.</div>
+                    </div>
+
+                    <form action="{{ url_for('admin.config_test_gemini') }}" method="POST" class="mb-4">
+                        <button type="submit" class="btn btn-admin btn-admin-secondary text-warning w-100">
+                            <i class="fas fa-bolt me-1"></i> Execute Live Gemini Connection Test
+                        </button>
+                    </form>
+
+                    <div class="p-3 rounded" style="background: rgba(59, 130, 246, 0.08); border: 1px solid var(--admin-info);">
+                        <div class="fw-bold text-white small mb-1"><i class="fas fa-shield-alt text-info me-1"></i> Safety Isolation Note</div>
+                        <div class="text-dim small">Free and Paid quota counters are completely isolated in the database telemetry table. Switching modes immediately changes active safety budgets without mixing usage data.</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- TAB 3: EMAIL & SMTP -->
+    <div class="tab-pane fade" id="email" role="tabpanel">
+        <div class="row g-4">
+            <div class="col-lg-6">
+                <div class="admin-card h-100 mb-0">
+                    <div class="admin-card-header">
+                        <h2 class="admin-card-title"><i class="fas fa-server text-info"></i> Mail Server Configuration</h2>
+                        {% if mail_config.configured %}
+                        <span class="badge-status active"><i class="fas fa-check"></i> CONFIGURED</span>
+                        {% else %}
+                        <span class="badge-status error"><i class="fas fa-ban"></i> UNCONFIGURED</span>
+                        {% endif %}
+                    </div>
+
+                    <div class="d-flex flex-column gap-2.5">
+                        <div class="p-2.5 rounded d-flex align-items-center justify-content-between" style="background: rgba(255,255,255,0.02); border: 1px solid var(--admin-border); font-size: 0.85rem;">
+                            <span class="text-muted fw-semibold">SMTP Host Server</span>
+                            <span class="fw-bold text-white font-mono">{{ mail_config.server }}</span>
+                        </div>
+                        <div class="p-2.5 rounded d-flex align-items-center justify-content-between" style="background: rgba(255,255,255,0.02); border: 1px solid var(--admin-border); font-size: 0.85rem;">
+                            <span class="text-muted fw-semibold">SMTP Port</span>
+                            <span class="fw-bold text-white font-mono">{{ mail_config.port }}</span>
+                        </div>
+                        <div class="p-2.5 rounded d-flex align-items-center justify-content-between" style="background: rgba(255,255,255,0.02); border: 1px solid var(--admin-border); font-size: 0.85rem;">
+                            <span class="text-muted fw-semibold">TLS Encryption</span>
+                            <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-0.5">TLS ENABLED</span>
+                        </div>
+                        <div class="p-2.5 rounded d-flex align-items-center justify-content-between" style="background: rgba(255,255,255,0.02); border: 1px solid var(--admin-border); font-size: 0.85rem;">
+                            <span class="text-muted fw-semibold">Sender Account</span>
+                            <span class="fw-bold text-white font-mono">{{ mail_config.username }}</span>
+                        </div>
+                        <div class="p-2.5 rounded d-flex align-items-center justify-content-between" style="background: rgba(255,255,255,0.02); border: 1px solid var(--admin-border); font-size: 0.85rem;">
+                            <span class="text-muted fw-semibold">SMTP Password</span>
+                            <code class="text-muted font-mono">{{ mail_config.password_masked }}</code>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-6">
+                <div class="admin-card h-100 mb-0">
+                    <div class="admin-card-header">
+                        <h2 class="admin-card-title"><i class="fas fa-paper-plane text-success"></i> Send Test Notification Email</h2>
+                    </div>
+
+                    <p class="text-muted small">Send a validated test email to verify Flask-Mail SMTP connectivity and delivery pipeline.</p>
+
+                    <form action="{{ url_for('admin.config_test_email') }}" method="POST">
+                        <div class="mb-3">
+                            <label class="form-label text-muted small fw-semibold">Destination Email Address</label>
+                            <input type="email" name="destination_email" class="form-control admin-input" value="hemantsah123456789@gmail.com" required placeholder="admin@example.com">
+                        </div>
+                        <div class="p-3 rounded mb-4" style="background: rgba(255,255,255,0.02); border: 1px solid var(--admin-border); font-size: 0.8rem;">
+                            <div class="fw-bold text-white mb-1"><i class="fas fa-shield-halved text-info me-1"></i> Security Protocol</div>
+                            <div class="text-dim">Test email execution is logged to <code>AdminActivityLog</code>. No credentials or passwords are transmitted in headers or logs.</div>
+                        </div>
+                        <div class="text-end">
+                            <button type="submit" class="btn btn-admin btn-admin-primary btn-admin-sm">
+                                <i class="fas fa-paper-plane me-1"></i> Send Test Email Now
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- TAB 4: MAINTENANCE MODE -->
+    <div class="tab-pane fade" id="maintenance" role="tabpanel">
+        <div class="admin-card mb-0">
+            <div class="admin-card-header">
+                <h2 class="admin-card-title"><i class="fas fa-screwdriver-wrench text-danger"></i> System Maintenance Mode Controls</h2>
+                {% if maintenance_active %}
+                <span class="badge-status error"><i class="fas fa-circle-exclamation"></i> MAINTENANCE ACTIVE</span>
+                {% else %}
+                <span class="badge-status active"><i class="fas fa-circle-check"></i> NORMAL OPERATIONAL</span>
+                {% endif %}
+            </div>
+
+            <div class="row g-4">
+                <div class="col-lg-7">
+                    <form action="{{ url_for('admin.config_toggle_maintenance') }}" method="POST">
+                        <div class="mb-3">
+                            <label class="form-label text-muted small fw-semibold">Public Maintenance Announcement Message</label>
+                            <textarea name="maintenance_message" class="form-control admin-input" rows="3">{{ maintenance_message }}</textarea>
+                        </div>
+
+                        <div class="p-3 rounded mb-4" style="background: rgba(239, 68, 68, 0.08); border: 1px solid var(--admin-danger);">
+                            <div class="fw-bold text-white small mb-1"><i class="fas fa-shield-cat text-danger me-1"></i> Administrator Lockout Protection</div>
+                            <div class="text-dim small">Enabling Maintenance Mode restricts student access to a maintenance banner. **Administrator account (ID 706) retains 100% full access to the Admin Panel at all times.**</div>
+                        </div>
+
+                        <div class="d-flex gap-2 justify-content-end">
+                            {% if maintenance_active %}
+                            <input type="hidden" name="enable" value="false">
+                            <button type="submit" class="btn btn-admin btn-admin-primary btn-admin-sm" onclick="return confirm('Disable Maintenance Mode and restore normal student access?');">
+                                <i class="fas fa-play me-1"></i> Restore Normal Operations
+                            </button>
+                            {% else %}
+                            <input type="hidden" name="enable" value="true">
+                            <button type="submit" class="btn btn-admin btn-admin-secondary text-danger btn-admin-sm" onclick="return confirm('Enable Maintenance Mode? Normal student access will be restricted.');">
+                                <i class="fas fa-pause me-1"></i> Enable Maintenance Mode
+                            </button>
+                            {% endif %}
+                        </div>
+                    </form>
+                </div>
+
+                <div class="col-lg-5">
+                    <div class="p-3 rounded h-100" style="background: rgba(255,255,255,0.02); border: 1px solid var(--admin-border);">
+                        <div class="fw-bold text-white small mb-2"><i class="fas fa-list-check text-primary me-1"></i> Maintenance Policy Rules</div>
+                        <ul class="text-muted small ps-3 mb-0" style="line-height: 1.6;">
+                            <li>Admin session remains logged in.</li>
+                            <li>Database records are never deleted.</li>
+                            <li>Background tasks remain functional.</li>
+                            <li>Every state change is recorded in <code>AdminActivityLog</code>.</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- TAB 5: DATABASE BACKUP MANAGER -->
+    <div class="tab-pane fade" id="backups" role="tabpanel">
+        <div class="admin-card p-0 mb-0">
+            <div class="admin-card-header px-4 py-3 mb-0">
+                <div class="d-flex align-items-center justify-content-between">
+                    <div>
+                        <h2 class="admin-card-title fs-6"><i class="fas fa-database text-success"></i> Database Backup Manager</h2>
+                        <div class="text-muted small">Active Database File: <code>smart_study.db</code> ({{ active_db_size_mb }} MB)</div>
+                    </div>
+                    <form action="{{ url_for('admin.config_create_backup') }}" method="POST">
+                        <button type="submit" class="btn btn-admin btn-admin-primary btn-admin-sm" onclick="return confirm('Create a timestamped database backup now?');">
+                            <i class="fas fa-plus me-1"></i> Create Timestamped Backup
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+            <div class="admin-table-container border-0">
+                <table class="admin-table">
+                    <thead>
+                        <tr>
+                            <th class="ps-4">Backup Filename</th>
+                            <th>File Size (MB)</th>
+                            <th>Creation Date &amp; Time</th>
+                            <th class="pe-4 text-end">Backup Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% if backups %}
+                        {% for b in backups %}
+                        <tr>
+                            <td class="ps-4">
+                                <span class="badge bg-secondary-subtle text-white border border-secondary px-2 py-1 font-mono fw-bold">{{ b.filename }}</span>
+                            </td>
+                            <td class="small text-white font-mono">{{ b.size_mb }} MB</td>
+                            <td class="small text-muted">{{ b.mtime_formatted }}</td>
+                            <td class="pe-4 text-end">
+                                <span class="badge-status active"><i class="fas fa-check-circle"></i> VERIFIED INTACT</span>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                        {% else %}
+                        <tr>
+                            <td colspan="4" class="text-center text-muted py-4">No database backups found in workspace directory.</td>
+                        </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- TAB 6: DATA EXPORT CENTER -->
+    <div class="tab-pane fade" id="exports" role="tabpanel">
+        <div class="row g-4">
+            <div class="col-lg-4">
+                <div class="admin-card h-100 mb-0">
+                    <div class="admin-card-header">
+                        <h2 class="admin-card-title"><i class="fas fa-users text-primary"></i> Student Data Exports</h2>
+                    </div>
+                    <p class="text-muted small">Export student accounts, academic profiles, assessment counts, and total study hours.</p>
+                    <div class="d-flex flex-column gap-2 mt-auto">
+                        <a href="{{ url_for('admin.bulk_export_students') }}" class="btn btn-admin btn-admin-secondary btn-admin-sm text-primary">
+                            <i class="fas fa-file-csv me-1"></i> Export Students (CSV)
+                        </a>
+                        <a href="{{ url_for('admin.bulk_export_students_json') }}" class="btn btn-admin btn-admin-secondary btn-admin-sm text-info">
+                            <i class="fas fa-file-code me-1"></i> Export Students (JSON)
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-4">
+                <div class="admin-card h-100 mb-0">
+                    <div class="admin-card-header">
+                        <h2 class="admin-card-title"><i class="fas fa-graduation-cap text-success"></i> Curriculum Exports</h2>
+                    </div>
+                    <p class="text-muted small">Export global normalized Subjects, levels of study, credit hours, and difficulty ratings.</p>
+                    <div class="d-flex flex-column gap-2 mt-auto">
+                        <a href="{{ url_for('admin.config_export_curriculum') }}" class="btn btn-admin btn-admin-secondary btn-admin-sm text-success">
+                            <i class="fas fa-file-csv me-1"></i> Export Curriculum (CSV)
+                        </a>
+                        <a href="{{ url_for('admin.config_export_curriculum_json') }}" class="btn btn-admin btn-admin-secondary btn-admin-sm text-info">
+                            <i class="fas fa-file-code me-1"></i> Export Curriculum (JSON)
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-4">
+                <div class="admin-card h-100 mb-0">
+                    <div class="admin-card-header">
+                        <h2 class="admin-card-title"><i class="fas fa-list-check text-warning"></i> Audit Log Exports</h2>
+                    </div>
+                    <p class="text-muted small">Export administrative action audit history logs with timestamps, admin ID, and entity details.</p>
+                    <div class="d-flex flex-column gap-2 mt-auto">
+                        <a href="{{ url_for('admin.config_export_audit_logs') }}" class="btn btn-admin btn-admin-secondary btn-admin-sm text-warning">
+                            <i class="fas fa-file-csv me-1"></i> Export Audit Logs (CSV)
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- TAB 7: SYSTEM DIAGNOSTICS -->
+    <div class="tab-pane fade" id="sysinfo" role="tabpanel">
+        <div class="admin-card mb-0">
+            <div class="admin-card-header">
+                <h2 class="admin-card-title"><i class="fas fa-circle-info text-secondary"></i> System Telemetry &amp; Diagnostics Overview</h2>
+            </div>
+
+            <div class="row g-3">
+                <div class="col-md-6 col-lg-3">
+                    <div class="p-3 rounded" style="background: rgba(255,255,255,0.02); border: 1px solid var(--admin-border);">
+                        <div class="text-muted small">Python Version</div>
+                        <div class="fw-bold text-white font-mono fs-5">{{ system_info.python_version }}</div>
+                    </div>
+                </div>
+                <div class="col-md-6 col-lg-3">
+                    <div class="p-3 rounded" style="background: rgba(255,255,255,0.02); border: 1px solid var(--admin-border);">
+                        <div class="text-muted small">Flask Environment</div>
+                        <div class="fw-bold text-white font-mono fs-5">{{ system_info.flask_env|upper }}</div>
+                    </div>
+                </div>
+                <div class="col-md-6 col-lg-3">
+                    <div class="p-3 rounded" style="background: rgba(255,255,255,0.02); border: 1px solid var(--admin-border);">
+                        <div class="text-muted small">Active Admin Account</div>
+                        <div class="fw-bold text-success font-mono fs-6">ID 706 (hemantsah123456789@gmail.com)</div>
+                    </div>
+                </div>
+                <div class="col-md-6 col-lg-3">
+                    <div class="p-3 rounded" style="background: rgba(255,255,255,0.02); border: 1px solid var(--admin-border);">
+                        <div class="text-muted small">Real Student Count</div>
+                        <div class="fw-bold text-info font-mono fs-5">{{ system_info.student_count }}</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+{% endblock %}

@@ -1,0 +1,12 @@
+{% extends 'base.html' %}
+{% block title %}ML Evaluation{% endblock %}
+
+{% block content %}
+<div class="card card-light p-4 text-center">
+    <h1 class="page-title mb-2">ML Predictor Has Moved</h1>
+    <p class="text-muted mb-4">Use the Random Forest Predictor for real assessment and marksheet-based risk scoring.</p>
+    <a href="{{ url_for('student.predict') }}" class="btn btn-primary">
+        <i class="fas fa-robot me-2"></i> Open ML Predictor
+    </a>
+</div>
+{% endblock %}

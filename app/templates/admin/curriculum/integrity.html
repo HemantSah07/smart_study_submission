@@ -1,0 +1,183 @@
+{% extends "admin/admin_base.html" %}
+
+{% block admin_title %}Curriculum Integrity & Health Scanner{% endblock %}
+
+{% block admin_content %}
+<div class="space-y-6">
+  <!-- Page Header -->
+  <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+    <div>
+      <h1 class="text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
+        <i class="bi bi-shield-check text-emerald-500"></i>
+        Curriculum Integrity & Health Scanner
+      </h1>
+      <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">
+        Read-only diagnostic audit of curriculum mapping integrity, orphaned subjects, and student enrolment health.
+      </p>
+    </div>
+    <div>
+      <a href="{{ url_for('admin.curriculum_programs') }}" class="inline-flex items-center gap-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg text-sm font-medium transition-colors">
+        <i class="bi bi-diagram-3"></i> Manage Programs
+      </a>
+    </div>
+  </div>
+
+  <!-- Diagnostic Metrics Cards -->
+  <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+    <div class="bg-white dark:bg-slate-800 rounded-xl p-5 border border-slate-200 dark:border-slate-700 shadow-sm">
+      <div class="flex items-center justify-between">
+        <span class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Total Subjects</span>
+        <div class="w-8 h-8 rounded-lg bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 flex items-center justify-center">
+          <i class="bi bi-journal-bookmark"></i>
+        </div>
+      </div>
+      <div class="text-2xl font-bold text-slate-900 dark:text-white mt-2">{{ total_subjects }}</div>
+      <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">Global catalog size</p>
+    </div>
+
+    <div class="bg-white dark:bg-slate-800 rounded-xl p-5 border border-slate-200 dark:border-slate-700 shadow-sm">
+      <div class="flex items-center justify-between">
+        <span class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Mapped Subjects</span>
+        <div class="w-8 h-8 rounded-lg bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
+          <i class="bi bi-link-45deg"></i>
+        </div>
+      </div>
+      <div class="text-2xl font-bold text-slate-900 dark:text-white mt-2">{{ mapped_count }} <span class="text-sm font-normal text-emerald-500">({{ pct_mapped }}%)</span></div>
+      <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">Attached to active programs</p>
+    </div>
+
+    <div class="bg-white dark:bg-slate-800 rounded-xl p-5 border border-slate-200 dark:border-slate-700 shadow-sm">
+      <div class="flex items-center justify-between">
+        <span class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Unmapped Subjects</span>
+        <div class="w-8 h-8 rounded-lg bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 flex items-center justify-center">
+          <i class="bi bi-exclamation-triangle"></i>
+        </div>
+      </div>
+      <div class="text-2xl font-bold text-slate-900 dark:text-white mt-2">{{ unmapped_count }}</div>
+      <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">Unmapped or cross-stream</p>
+    </div>
+
+    <div class="bg-white dark:bg-slate-800 rounded-xl p-5 border border-slate-200 dark:border-slate-700 shadow-sm">
+      <div class="flex items-center justify-between">
+        <span class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Content Gaps</span>
+        <div class="w-8 h-8 rounded-lg bg-rose-50 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400 flex items-center justify-center">
+          <i class="bi bi-file-earmark-x"></i>
+        </div>
+      </div>
+      <div class="text-2xl font-bold text-slate-900 dark:text-white mt-2">{{ subjects_no_chaps }}</div>
+      <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">Subjects missing chapters</p>
+    </div>
+  </div>
+
+  <!-- Content Hierarchy Audit Summary -->
+  <div class="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-6 shadow-sm">
+    <h3 class="text-base font-semibold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
+      <i class="bi bi-diagram-2 text-indigo-500"></i> Curriculum Content Hierarchy Health
+    </h3>
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div class="p-4 rounded-lg bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700">
+        <span class="text-xs font-medium text-slate-500 dark:text-slate-400">Subjects w/o Chapters</span>
+        <div class="text-xl font-bold text-slate-800 dark:text-slate-200 mt-1">{{ subjects_no_chaps }}</div>
+      </div>
+      <div class="p-4 rounded-lg bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700">
+        <span class="text-xs font-medium text-slate-500 dark:text-slate-400">Chapters w/o Topics</span>
+        <div class="text-xl font-bold text-slate-800 dark:text-slate-200 mt-1">{{ chaps_no_topics }}</div>
+      </div>
+      <div class="p-4 rounded-lg bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700">
+        <span class="text-xs font-medium text-slate-500 dark:text-slate-400">Topics w/o Learning Material</span>
+        <div class="text-xl font-bold text-slate-800 dark:text-slate-200 mt-1">{{ topics_no_mat }}</div>
+      </div>
+      <div class="p-4 rounded-lg bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700">
+        <span class="text-xs font-medium text-slate-500 dark:text-slate-400">Subjects w/o MCQs</span>
+        <div class="text-xl font-bold text-slate-800 dark:text-slate-200 mt-1">{{ subjects_no_mcq }}</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Program Mapping Integrity Table -->
+  <div class="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
+    <div class="p-6 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
+      <h3 class="text-base font-semibold text-slate-900 dark:text-white flex items-center gap-2">
+        <i class="bi bi-mortarboard text-indigo-500"></i> Program Semester Mapping Integrity
+      </h3>
+      <span class="text-xs text-slate-500 dark:text-slate-400">{{ program_audit|length }} Programs Audited</span>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="w-full text-left text-sm">
+        <thead class="bg-slate-50 dark:bg-slate-900/50 text-slate-500 dark:text-slate-400 uppercase text-xs">
+          <tr>
+            <th class="px-6 py-3">Program</th>
+            <th class="px-6 py-3">Education Level</th>
+            <th class="px-6 py-3">University</th>
+            <th class="px-6 py-3 text-center">Total Mapped</th>
+            <th class="px-6 py-3 text-center">Sem 1-6 Breakdown</th>
+            <th class="px-6 py-3 text-right">Status</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-200 dark:divide-slate-700 text-slate-700 dark:text-slate-300">
+          {% for item in program_audit %}
+          <tr class="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
+            <td class="px-6 py-4 font-semibold text-slate-900 dark:text-white">
+              <a href="{{ url_for('admin.curriculum_program_detail', prog_id=item.program.id) }}" class="hover:text-indigo-600 dark:hover:text-indigo-400">
+                {{ item.program.name }}
+              </a>
+            </td>
+            <td class="px-6 py-4 text-xs">{{ item.level_name }}</td>
+            <td class="px-6 py-4 text-xs">{{ item.uni_name }}</td>
+            <td class="px-6 py-4 text-center font-bold">{{ item.total_mapped }}</td>
+            <td class="px-6 py-4 text-center text-xs">
+              <div class="flex items-center justify-center gap-1">
+                {% for sem, cnt in item.sem_counts.items() %}
+                <span class="px-1.5 py-0.5 rounded text-[10px] font-mono {% if cnt > 0 %}bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300{% else %}bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500{% endif %}">
+                  S{{ loop.index }}: {{ cnt }}
+                </span>
+                {% endfor %}
+              </div>
+            </td>
+            <td class="px-6 py-4 text-right">
+              {% if item.status == "HEALTHY" %}
+              <span class="px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400">HEALTHY</span>
+              {% elif item.status == "WARNING" %}
+              <span class="px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400">WARNING</span>
+              {% else %}
+              <span class="px-2.5 py-1 rounded-full text-xs font-semibold bg-rose-100 text-rose-800 dark:bg-rose-900/30 dark:text-rose-400">CRITICAL</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Student Enrolment Integrity Audit -->
+  <div class="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-6 shadow-sm">
+    <h3 class="text-base font-semibold text-slate-900 dark:text-white mb-2 flex items-center gap-2">
+      <i class="bi bi-people text-indigo-500"></i> Student Enrolment Disconnect Audit
+    </h3>
+    <p class="text-xs text-slate-500 dark:text-slate-400 mb-4">
+      Students registered with an active program who currently have 0 subjects in <code>StudentSubject</code>.
+    </p>
+
+    {% if students_zero_subjs %}
+    <div class="space-y-2">
+      {% for st_item in students_zero_subjs %}
+      <div class="flex items-center justify-between p-3 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/40 text-amber-900 dark:text-amber-200 text-xs">
+        <div>
+          <span class="font-bold">{{ st_item.user.email }}</span> (ID {{ st_item.user.id }}) &mdash;
+          Program: <span class="font-semibold">{{ st_item.profile.program or 'None' }}</span> |
+          Semester: <span class="font-semibold">{{ st_item.profile.semester or 'None' }}</span>
+        </div>
+        <span class="px-2 py-0.5 rounded font-mono text-[10px] bg-amber-200 dark:bg-amber-900 text-amber-900 dark:text-amber-100">0 Subjects Enrolled</span>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="flex items-center gap-2 p-3 rounded-lg bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-900/40 text-emerald-800 dark:text-emerald-300 text-xs">
+      <i class="bi bi-check-circle-fill text-emerald-500"></i>
+      All students with an active program have enrolled subjects in <code>StudentSubject</code>.
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

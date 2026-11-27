@@ -1,0 +1,161 @@
+{% extends 'base.html' %}
+{% block title %}Review Zip Import - Smart Study{% endblock %}
+
+{% block content %}
+<style>
+    .review-header {
+        background: linear-gradient(135deg, rgba(30, 41, 59, 0.7), rgba(15, 23, 42, 0.9));
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: var(--radius-lg, 16px);
+        padding: 2rem;
+        margin-bottom: 2rem;
+        backdrop-filter: blur(12px);
+    }
+    .unmatched-card {
+        background: rgba(30, 41, 59, 0.4);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: var(--radius-md, 12px);
+        padding: 1.5rem;
+        margin-bottom: 1rem;
+        transition: all 0.2s ease;
+    }
+    .unmatched-card:hover {
+        border-color: var(--neon-blue, #38bdf8);
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+    }
+    .folder-icon {
+        width: 42px; height: 42px;
+        border-radius: 10px;
+        background: rgba(245, 158, 11, 0.15);
+        border: 1px solid rgba(245, 158, 11, 0.3);
+        color: #f59e0b;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 1.2rem;
+    }
+</style>
+
+<div class="container py-4 stagger-1">
+    <!-- Header -->
+    <div class="review-header d-flex justify-content-between align-items-center flex-wrap gap-3">
+        <div>
+            <div class="d-flex align-items-center gap-2 mb-1">
+                <span class="badge bg-warning bg-opacity-20 text-warning px-3 py-2 fs-6">
+                    <i class="fas fa-exclamation-triangle me-1"></i> Review Required
+                </span>
+                <span class="text-muted font-monospace small">Batch #{{ batch.id }}</span>
+            </div>
+            <h2 class="fw-bold text-white mb-1">Confirm Material Subject Assignments</h2>
+            <p class="text-muted mb-0">
+                We auto-linked <strong class="text-success">{{ batch.matched_files }} files</strong> directly to your subjects! 
+                Here are <strong class="text-warning">{{ batch.unmatched_files }} file(s)</strong> we couldn't confidently identify — please confirm which subject they belong to below.
+            </p>
+        </div>
+    </div>
+
+    <!-- Stats Bar -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-4">
+            <div class="p-3 rounded-3 bg-dark border border-secondary d-flex align-items-center gap-3">
+                <div class="folder-icon bg-primary bg-opacity-20 text-primary border-primary">
+                    <i class="fas fa-file-archive"></i>
+                </div>
+                <div>
+                    <div class="text-muted small">Total Files Found</div>
+                    <div class="fs-4 fw-bold text-white">{{ batch.total_files_found }}</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="p-3 rounded-3 bg-dark border border-secondary d-flex align-items-center gap-3">
+                <div class="folder-icon bg-success bg-opacity-20 text-success border-success">
+                    <i class="fas fa-check-circle"></i>
+                </div>
+                <div>
+                    <div class="text-muted small">Auto-Matched Files</div>
+                    <div class="fs-4 fw-bold text-success">{{ batch.matched_files }}</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="p-3 rounded-3 bg-dark border border-secondary d-flex align-items-center gap-3">
+                <div class="folder-icon">
+                    <i class="fas fa-question-circle"></i>
+                </div>
+                <div>
+                    <div class="text-muted small">Needing Confirmation</div>
+                    <div class="fs-4 fw-bold text-warning">{{ batch.unmatched_items|length }}</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Resolution Form -->
+    <form action="{{ url_for('student.resolve_import_batch', batch_id=batch.id) }}" method="POST">
+        <div class="mb-4">
+            <h5 class="fw-bold text-white mb-3">Files Needing Subject Confirmation</h5>
+            {% for item in batch.unmatched_items %}
+            <div class="unmatched-card">
+                <div class="row align-items-center g-3">
+                    <div class="col-md-5 d-flex align-items-center gap-3">
+                        <div class="folder-icon flex-shrink-0">
+                            <i class="fas fa-folder-open"></i>
+                        </div>
+                        <div>
+                            <div class="fw-bold text-white text-truncate" title="{{ item.detected_name }}">{{ item.detected_name }}</div>
+                            <div class="text-muted small">
+                                <i class="fas fa-file me-1"></i>{{ item.file_count }} document(s) inside
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-7">
+                        <label class="form-label text-muted small mb-1">Assign to Subject</label>
+                        <select name="subject_map_{{ item.id }}" class="form-select bg-dark border-secondary text-white" required>
+                            <option value="">-- Select Enrolled Subject --</option>
+                            <option value="skip">-- Skip / Ignore this folder --</option>
+                            {% for subj in enrolled_subjects %}
+                            <option value="{{ subj.id }}" {% if item.suggested_subject_id == subj.id %}selected{% endif %}>
+                                {{ subj.name }} {% if item.suggested_subject_id == subj.id %}(Best Match Suggestion){% endif %}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <div class="d-flex justify-content-between align-items-center border-top border-secondary pt-4">
+            <div class="d-flex gap-2">
+                <a href="{{ url_for('student.study_material') }}" class="btn btn-outline-secondary">
+                    <i class="fas fa-arrow-left me-1"></i> Back to Materials
+                </a>
+                <button type="button" class="btn btn-outline-danger" onclick="confirmDeleteBatch({{ batch.id }}, '{{ batch.source_filename|e }}')">
+                    <i class="fas fa-trash-alt me-1"></i> Permanently Delete Batch
+                </button>
+            </div>
+            <button type="submit" class="btn btn-primary px-4 py-2 fw-bold">
+                <i class="fas fa-check me-2"></i> Confirm &amp; Import Material
+            </button>
+        </div>
+    </form>
+</div>
+
+<script>
+    function confirmDeleteBatch(batchId, batchName) {
+        if (confirm(`Are you sure you want to PERMANENTLY delete zip batch "${batchName}" and all its extracted files?`)) {
+            fetch(`/student/study-materials/delete-batch/${batchId}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            })
+            .then(res => res.json())
+            .then(data => {
+                alert(data.message || "Batch deleted successfully.");
+                window.location.href = "{{ url_for('student.study_material') }}";
+            })
+            .catch(err => {
+                alert("Error deleting batch: " + err);
+            });
+        }
+    }
+</script>
+{% endblock %}

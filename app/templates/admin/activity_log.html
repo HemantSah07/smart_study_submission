@@ -1,0 +1,185 @@
+{% extends 'admin/admin_base.html' %}
+{% block title %}System Audit Logs &amp; Security History — Admin Control Center{% endblock %}
+
+{% block breadcrumb_items %}
+    <span class="active-item">Audit Logs &amp; Security History</span>
+{% endblock %}
+
+{% block admin_content %}
+<!-- Header Bar -->
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+    <div>
+        <h1 class="h3 fw-bold text-white mb-1"><i class="fas fa-shield-halved me-2 text-primary"></i> System Audit Logs &amp; Security History</h1>
+        <p class="text-muted small mb-0">Immutable audit trail of administrator actions, system configuration updates, database backups, data exports, and maintenance events.</p>
+    </div>
+    <div class="d-flex gap-2">
+        <a href="{{ url_for('admin.config_export_audit_logs') }}" class="btn btn-admin btn-admin-primary btn-admin-sm">
+            <i class="fas fa-file-csv me-1"></i> Export Audit Logs CSV
+        </a>
+    </div>
+</div>
+
+<!-- Security & Telemetry Notice Card -->
+<div class="p-3 rounded mb-4" style="background: rgba(59, 130, 246, 0.08); border: 1px solid var(--admin-info);">
+    <div class="d-flex align-items-start gap-2">
+        <i class="fas fa-info-circle text-info mt-1"></i>
+        <div>
+            <div class="fw-bold text-white small">Authentication &amp; Telemetry Notice</div>
+            <div class="text-dim small">
+                IP address logging and failed password attempt persistent logs are not currently persisted by the authentication architecture.
+                AI prompt-level token usage and response latency telemetry are also not persisted in audit tables.
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Filter Bar Card -->
+<div class="admin-card p-3 mb-4">
+    <form action="{{ url_for('admin.activity_log') }}" method="GET" class="row g-2 align-items-center">
+        <div class="col-12 col-sm-6 col-md-3">
+            <label class="form-label text-muted x-small fw-bold mb-1">Action Type</label>
+            <select name="action" class="form-select admin-input py-1 px-2 text-white small" style="font-size: 0.82rem;">
+                <option value="">All Action Types</option>
+                {% for act in actions %}
+                <option value="{{ act }}" {% if action_filter == act %}selected{% endif %}>{{ act }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="col-12 col-sm-6 col-md-3">
+            <label class="form-label text-muted x-small fw-bold mb-1">Keyword Search</label>
+            <input type="text" name="q" class="form-control admin-input py-1 px-2 text-white small" value="{{ q }}" placeholder="Search action, entity, details..." style="font-size: 0.82rem;">
+        </div>
+
+        <div class="col-12 col-sm-6 col-md-2">
+            <label class="form-label text-muted x-small fw-bold mb-1">From Date</label>
+            <input type="date" name="from_date" class="form-control admin-input py-1 px-2 text-white small" value="{{ from_date }}" style="font-size: 0.82rem;">
+        </div>
+
+        <div class="col-12 col-sm-6 col-md-2">
+            <label class="form-label text-muted x-small fw-bold mb-1">To Date</label>
+            <input type="date" name="to_date" class="form-control admin-input py-1 px-2 text-white small" value="{{ to_date }}" style="font-size: 0.82rem;">
+        </div>
+
+        <div class="col-12 col-md-2 d-flex gap-1 align-self-end">
+            <button type="submit" class="btn btn-admin btn-admin-primary btn-admin-sm w-100 py-1">
+                <i class="fas fa-search me-1"></i> Filter
+            </button>
+            <a href="{{ url_for('admin.activity_log') }}" class="btn btn-admin btn-admin-secondary btn-admin-sm py-1" title="Reset Filters">
+                <i class="fas fa-rotate-left"></i>
+            </a>
+        </div>
+    </form>
+</div>
+
+<!-- Audit Log Table Card -->
+<div class="admin-card p-0 mb-4">
+    <div class="admin-card-header px-4 py-3 mb-0">
+        <div class="d-flex align-items-center justify-content-between">
+            <h2 class="admin-card-title fs-6"><i class="fas fa-list text-primary"></i> Administrative Action History</h2>
+            <span class="badge bg-secondary-subtle text-white border border-secondary px-2 py-1 font-mono fw-bold">Total Logs: {{ total }}</span>
+        </div>
+    </div>
+
+    <div class="admin-table-container border-0">
+        <table class="admin-table">
+            <thead>
+                <tr>
+                    <th class="ps-4">Log ID</th>
+                    <th>Timestamp</th>
+                    <th>Admin Account</th>
+                    <th>Action</th>
+                    <th>Target Entity</th>
+                    <th class="pe-4">Action Details</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% if logs %}
+                {% for log in logs %}
+                <tr>
+                    <td class="ps-4 font-mono text-muted">#{{ log.id }}</td>
+                    <td class="small text-muted font-mono">{{ log.timestamp.strftime('%Y-%m-%d %H:%M:%S') if log.timestamp else 'N/A' }}</td>
+                    <td class="small">
+                        {% set admin_obj = admin_users.get(log.admin_user_id) %}
+                        {% if admin_obj %}
+                        <span class="fw-bold text-white"><i class="fas fa-user-shield text-primary me-1"></i> {{ admin_obj.email }}</span>
+                        <div class="x-small text-muted font-mono">ID #{{ admin_obj.id }}</div>
+                        {% else %}
+                        <span class="text-muted">Admin #{{ log.admin_user_id }}</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if 'backup' in log.action or 'create' in log.action %}
+                        <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1 font-mono fw-bold">{{ log.action }}</span>
+                        {% elif 'export' in log.action %}
+                        <span class="badge bg-info-subtle text-info border border-info-subtle px-2 py-1 font-mono fw-bold">{{ log.action }}</span>
+                        {% elif 'test' in log.action %}
+                        <span class="badge bg-warning-subtle text-warning border border-warning-subtle px-2 py-1 font-mono fw-bold">{{ log.action }}</span>
+                        {% elif 'deactivate' in log.action or 'delete' in log.action or 'archive' in log.action %}
+                        <span class="badge bg-danger-subtle text-danger border border-danger-subtle px-2 py-1 font-mono fw-bold">{{ log.action }}</span>
+                        {% else %}
+                        <span class="badge bg-primary-subtle text-primary border border-primary-subtle px-2 py-1 font-mono fw-bold">{{ log.action }}</span>
+                        {% endif %}
+                    </td>
+                    <td class="small text-muted">
+                        {% if log.entity_type %}
+                        <span class="text-white fw-semibold">{{ log.entity_type }}</span>
+                        {% if log.entity_id %}<code class="text-dim font-mono">#{{ log.entity_id }}</code>{% endif %}
+                        {% else %}
+                        <span class="text-dim">—</span>
+                        {% endif %}
+                    </td>
+                    <td class="pe-4 small text-white" style="max-width: 380px;">
+                        <div class="text-truncate" title="{{ log.detail }}">{{ log.detail or '—' }}</div>
+                    </td>
+                </tr>
+                {% endfor %}
+                {% else %}
+                <tr>
+                    <td colspan="6" class="text-center text-muted py-4">No audit log records match the selected filter criteria.</td>
+                </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Server-Side Pagination Bar -->
+    {% if pages > 1 %}
+    <div class="px-4 py-3 border-top border-secondary d-flex align-items-center justify-content-between">
+        <div class="text-muted small">
+            Showing logs <span class="fw-bold text-white">{{ (page - 1) * 20 + 1 }}</span> to <span class="fw-bold text-white">{{ [page * 20, total]|min }}</span> of <span class="fw-bold text-white">{{ total }}</span>
+        </div>
+
+        <ul class="pagination pagination-sm mb-0">
+            {% if page > 1 %}
+            <li class="page-item">
+                <a class="page-link bg-dark text-white border-secondary" href="{{ url_for('admin.activity_log', page=page-1, action=action_filter, q=q, from_date=from_date, to_date=to_date) }}">
+                    <i class="fas fa-chevron-left"></i> Previous
+                </a>
+            </li>
+            {% endif %}
+
+            {% for p in range(1, pages + 1) %}
+            {% if p == page %}
+            <li class="page-item active">
+                <span class="page-link bg-primary text-white border-primary">{{ p }}</span>
+            </li>
+            {% elif p <= 3 or p >= pages - 2 or (p >= page - 1 and p <= page + 1) %}
+            <li class="page-item">
+                <a class="page-link bg-dark text-white border-secondary" href="{{ url_for('admin.activity_log', page=p, action=action_filter, q=q, from_date=from_date, to_date=to_date) }}">{{ p }}</a>
+            </li>
+            {% endif %}
+            {% endfor %}
+
+            {% if page < pages %}
+            <li class="page-item">
+                <a class="page-link bg-dark text-white border-secondary" href="{{ url_for('admin.activity_log', page=page+1, action=action_filter, q=q, from_date=from_date, to_date=to_date) }}">
+                    Next <i class="fas fa-chevron-right"></i>
+                </a>
+            </li>
+            {% endif %}
+        </ul>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

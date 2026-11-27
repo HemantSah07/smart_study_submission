@@ -1,0 +1,295 @@
+{% extends 'admin/admin_base.html' %}
+{% block title %}Cohort Analytics &amp; Risk Reporting — Admin Control Center{% endblock %}
+
+{% block breadcrumb_items %}
+    <span class="active-item">Cohort Analytics</span>
+{% endblock %}
+
+{% block admin_content %}
+<!-- Header Bar -->
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+    <div>
+        <h1 class="h3 fw-bold text-white mb-1"><i class="fas fa-chart-column me-2 text-primary"></i> Cohort Analytics &amp; Risk Reporting</h1>
+        <p class="text-muted small mb-0">Multi-dimension academic cohort breakdown, student profile completion metrics, and risk evaluation reporting using real database records.</p>
+    </div>
+    <div class="d-flex gap-2">
+        <a href="{{ url_for('admin.analytics_detail') }}" class="btn btn-admin btn-admin-secondary btn-admin-sm">
+            <i class="fas fa-microscope me-1"></i> Advanced Feature Importances
+        </a>
+        <a href="{{ url_for('admin.analytics') }}" class="btn btn-admin btn-admin-secondary btn-admin-sm">
+            <i class="fas fa-rotate me-1"></i> Refresh
+        </a>
+    </div>
+</div>
+
+<!-- Multi-Dimension Filter Bar Card -->
+<div class="admin-card p-3 mb-4">
+    <form action="{{ url_for('admin.analytics') }}" method="GET" class="row g-2 align-items-center">
+        <div class="col-12 col-sm-6 col-md-2">
+            <label class="form-label text-muted x-small fw-bold mb-1">Education Level</label>
+            <select name="level" class="form-select admin-input py-1 px-2 text-white small" style="font-size: 0.82rem;">
+                <option value="">All Levels</option>
+                {% for l in education_levels %}
+                <option value="{{ l.name }}" {% if sel_level == l.name %}selected{% endif %}>{{ l.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="col-12 col-sm-6 col-md-3">
+            <label class="form-label text-muted x-small fw-bold mb-1">University</label>
+            <select name="university" class="form-select admin-input py-1 px-2 text-white small" style="font-size: 0.82rem;">
+                <option value="">All Universities</option>
+                {% for u in universities %}
+                <option value="{{ u.name }}" {% if sel_university == u.name %}selected{% endif %}>{{ u.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="col-12 col-sm-6 col-md-3">
+            <label class="form-label text-muted x-small fw-bold mb-1">Program</label>
+            <select name="program" class="form-select admin-input py-1 px-2 text-white small" style="font-size: 0.82rem;">
+                <option value="">All Programs</option>
+                {% for p in programs %}
+                <option value="{{ p.name }}" {% if sel_program == p.name %}selected{% endif %}>{{ p.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="col-12 col-sm-6 col-md-2">
+            <label class="form-label text-muted x-small fw-bold mb-1">Account Status</label>
+            <select name="status" class="form-select admin-input py-1 px-2 text-white small" style="font-size: 0.82rem;">
+                <option value="">All Statuses</option>
+                <option value="active" {% if sel_status == 'active' %}selected{% endif %}>Active Only</option>
+                <option value="inactive" {% if sel_status == 'inactive' %}selected{% endif %}>Inactive Only</option>
+            </select>
+        </div>
+
+        <div class="col-12 col-md-2 d-flex gap-1 align-self-end">
+            <button type="submit" class="btn btn-admin btn-admin-primary btn-admin-sm w-100 py-1">
+                <i class="fas fa-filter me-1"></i> Filter
+            </button>
+            <a href="{{ url_for('admin.analytics') }}" class="btn btn-admin btn-admin-secondary btn-admin-sm py-1" title="Reset Filters">
+                <i class="fas fa-rotate-left"></i>
+            </a>
+        </div>
+    </form>
+</div>
+
+<!-- Top KPI Cards Bar -->
+<div class="row g-3 mb-4">
+    <div class="col-12 col-sm-6 col-xl-3">
+        <div class="stat-card p-3">
+            <div class="d-flex align-items-center justify-content-between">
+                <div>
+                    <div class="stat-label">Total Monitored Students</div>
+                    <div class="stat-value text-white">{{ total_monitored }}</div>
+                </div>
+                <div class="stat-icon text-primary"><i class="fas fa-users fs-4"></i></div>
+            </div>
+            <div class="stat-subtext mt-1">
+                <span class="text-success"><i class="fas fa-check-circle me-1"></i> {{ active_students }} Active</span>
+                {% if inactive_students > 0 %}
+                &bull; <span class="text-danger"><i class="fas fa-circle-pause me-1"></i> {{ inactive_students }} Inactive</span>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="col-12 col-sm-6 col-xl-3">
+        <div class="stat-card p-3">
+            <div class="d-flex align-items-center justify-content-between">
+                <div>
+                    <div class="stat-label">Profile Completion Rate</div>
+                    <div class="stat-value text-white">{{ profile_completion_rate }}%</div>
+                </div>
+                <div class="stat-icon text-info"><i class="fas fa-id-card fs-4"></i></div>
+            </div>
+            <div class="stat-subtext mt-1 text-muted">Level, School/Uni, Program &amp; GPA</div>
+        </div>
+    </div>
+
+    <div class="col-12 col-sm-6 col-xl-3">
+        <div class="stat-card p-3">
+            <div class="d-flex align-items-center justify-content-between">
+                <div>
+                    <div class="stat-label">AI Study Materials</div>
+                    <div class="stat-value text-white">{{ total_ai_materials }}</div>
+                </div>
+                <div class="stat-icon text-warning"><i class="fas fa-book-journal-whills fs-4"></i></div>
+            </div>
+            <div class="stat-subtext mt-1 text-muted">Persisted DB study materials</div>
+        </div>
+    </div>
+
+    <div class="col-12 col-sm-6 col-xl-3">
+        <div class="stat-card p-3">
+            <div class="d-flex align-items-center justify-content-between">
+                <div>
+                    <div class="stat-label">ML Prediction Status</div>
+                    <div class="stat-value fs-6 mt-1">
+                        {% if has_predictions %}
+                        <span class="badge-status active"><i class="fas fa-check"></i> EVALUATED</span>
+                        {% else %}
+                        <span class="badge-status warning"><i class="fas fa-clock"></i> NOT TRACKED</span>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="stat-icon text-success"><i class="fas fa-brain fs-4"></i></div>
+            </div>
+            <div class="stat-subtext mt-1 text-muted">
+                {% if has_predictions %}Predictions available{% else %}No prediction records in DB{% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Academic Level Cohort Table Card -->
+<div class="admin-card p-0 mb-4">
+    <div class="admin-card-header px-4 py-3 mb-0">
+        <div class="d-flex align-items-center justify-content-between">
+            <h2 class="admin-card-title fs-6"><i class="fas fa-table text-primary"></i> Academic Cohort Metrics (Grouped by Education Level)</h2>
+            <span class="text-muted small">Real database metrics only</span>
+        </div>
+    </div>
+
+    <div class="admin-table-container border-0">
+        <table class="admin-table">
+            <thead>
+                <tr>
+                    <th class="ps-4">Cohort Level</th>
+                    <th>Students</th>
+                    <th>Active / Inactive</th>
+                    <th>Avg GPA</th>
+                    <th>Avg Attendance</th>
+                    <th>Avg Study Hours</th>
+                    <th class="pe-4 text-end">Avg Assessment</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% if cohorts %}
+                {% for c in cohorts %}
+                <tr>
+                    <td class="ps-4">
+                        <span class="fw-bold text-white fs-6">{{ c.level }}</span>
+                    </td>
+                    <td>
+                        <span class="badge bg-secondary-subtle text-white border border-secondary px-2 py-1 font-mono fw-bold">{{ c.student_count }}</span>
+                    </td>
+                    <td class="small">
+                        <span class="text-success fw-semibold"><i class="fas fa-circle-check me-1"></i> {{ c.active_count }}</span>
+                        <span class="text-muted mx-1">/</span>
+                        <span class="text-muted"><i class="fas fa-circle-pause me-1"></i> {{ c.inactive_count }}</span>
+                    </td>
+                    <td class="small text-white font-mono">
+                        {% if c.avg_gpa is not none %}{{ c.avg_gpa }}{% else %}<span class="text-muted">Not Tracked</span>{% endif %}
+                    </td>
+                    <td class="small text-white font-mono">
+                        {% if c.avg_attendance is not none %}{{ c.avg_attendance }}%{% else %}<span class="text-muted">Not Tracked</span>{% endif %}
+                    </td>
+                    <td class="small text-white font-mono">
+                        {% if c.avg_study_hours is not none %}{{ c.avg_study_hours }} hrs{% else %}<span class="text-muted font-normal">Not Tracked</span>{% endif %}
+                    </td>
+                    <td class="pe-4 text-end small font-mono">
+                        {% if c.avg_assessment is not none %}{{ c.avg_assessment }}%{% else %}<span class="text-muted font-normal">Not Tracked</span>{% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+                {% else %}
+                <tr>
+                    <td colspan="7" class="text-center text-muted py-4">No student data available for the selected filters.</td>
+                </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- ML Risk Distribution & AI Materials Grid -->
+<div class="row g-4 mb-4">
+    <!-- Risk Profile Breakdown -->
+    <div class="col-lg-6">
+        <div class="admin-card h-100 mb-0">
+            <div class="admin-card-header">
+                <h2 class="admin-card-title"><i class="fas fa-chart-pie text-warning"></i> ML Academic Risk Distribution</h2>
+                {% if has_predictions %}
+                <span class="badge bg-primary-subtle text-primary border border-primary-subtle px-2 py-0.5">Real Predictions</span>
+                {% else %}
+                <span class="badge bg-secondary-subtle text-muted border border-secondary px-2 py-0.5">No DB Records</span>
+                {% endif %}
+            </div>
+
+            {% if has_predictions %}
+            {% set total_p = (low_risk + med_risk + high_risk) or 1 %}
+            <div class="d-flex flex-column gap-3 py-2">
+                <div>
+                    <div class="d-flex justify-content-between small fw-semibold mb-1">
+                        <span class="text-success"><i class="fas fa-circle me-1"></i> Low Risk Students</span>
+                        <span class="text-white font-mono">{{ low_risk }} ({{ ((low_risk / total_p)*100)|round(1) }}%)</span>
+                    </div>
+                    <div class="progress" style="height: 8px; background: rgba(255,255,255,0.05);">
+                        <div class="progress-bar bg-success" style="width: {{ (low_risk / total_p)*100 }}%;"></div>
+                    </div>
+                </div>
+
+                <div>
+                    <div class="d-flex justify-content-between small fw-semibold mb-1">
+                        <span class="text-warning"><i class="fas fa-circle me-1"></i> Medium Risk Students</span>
+                        <span class="text-white font-mono">{{ med_risk }} ({{ ((med_risk / total_p)*100)|round(1) }}%)</span>
+                    </div>
+                    <div class="progress" style="height: 8px; background: rgba(255,255,255,0.05);">
+                        <div class="progress-bar bg-warning" style="width: {{ (med_risk / total_p)*100 }}%;"></div>
+                    </div>
+                </div>
+
+                <div>
+                    <div class="d-flex justify-content-between small fw-semibold mb-1">
+                        <span class="text-danger"><i class="fas fa-circle me-1"></i> High Risk Students</span>
+                        <span class="text-white font-mono">{{ high_risk }} ({{ ((high_risk / total_p)*100)|round(1) }}%)</span>
+                    </div>
+                    <div class="progress" style="height: 8px; background: rgba(255,255,255,0.05);">
+                        <div class="progress-bar bg-danger" style="width: {{ (high_risk / total_p)*100 }}%;"></div>
+                    </div>
+                </div>
+            </div>
+            {% else %}
+            <div class="p-4 text-center text-muted">
+                <i class="fas fa-chart-line fs-2 text-dim mb-2 d-block"></i>
+                <div class="fw-bold text-white mb-1">Risk analytics unavailable</div>
+                <div class="small text-dim">No persisted ML prediction records are currently available in the database.</div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Generated Learning Materials by Subject -->
+    <div class="col-lg-6">
+        <div class="admin-card h-100 mb-0">
+            <div class="admin-card-header">
+                <h2 class="admin-card-title"><i class="fas fa-book-journal-whills text-success"></i> Generated Learning Materials by Subject</h2>
+                <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-0.5">Persisted Materials</span>
+            </div>
+
+            {% if ai_materials_by_subject %}
+            <div class="d-flex flex-column gap-2" style="max-height: 220px; overflow-y: auto;">
+                {% for item in ai_materials_by_subject[:8] %}
+                <div class="p-2 rounded d-flex align-items-center justify-content-between" style="background: rgba(255,255,255,0.02); border: 1px solid var(--admin-border); font-size: 0.85rem;">
+                    <span class="text-white fw-semibold text-truncate me-2">{{ item.subject }}</span>
+                    <span class="badge bg-secondary-subtle text-white border border-secondary px-2 py-0.5 font-mono">{{ item.count }} materials</span>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="p-4 text-center text-muted">
+                <i class="fas fa-book-open fs-2 text-dim mb-2 d-block"></i>
+                <div class="fw-bold text-white mb-1">No generated materials found</div>
+                <div class="small text-dim">Learning materials will populate automatically as AI generates topic content.</div>
+            </div>
+            {% endif %}
+
+            <div class="p-2.5 rounded mt-3" style="background: rgba(59, 130, 246, 0.06); border: 1px solid var(--admin-info); font-size: 0.78rem;">
+                <i class="fas fa-info-circle text-info me-1"></i> Gemini API request-level usage and prompt token telemetry are not currently persisted by the application.
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

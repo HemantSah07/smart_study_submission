@@ -1,0 +1,54 @@
+# Virtual environment
+venv/
+env/
+.env
+
+# Python cache / compiled files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Flask instance folder (contains large seeds, databases, data csvs)
+instance/
+
+# Databases
+*.db
+*.sqlite
+*.sqlite3
+
+# ML models (large binaries) and training datasets (large text files)
+*.pkl
+models/*.csv
+
+# AI Agent workspace
+.agents/
+
+# User uploads
+app/static/uploads/
+uploads/
+materials/
+
+
+# IDE configurations
+.vscode/
+.idea/
+
+# OS-specific metadata
+.DS_Store
+Thumbs.db
+
+# Scratch/debug scripts
+scratch/
+
+# Application logs
+*.log
+logs/
+
+# Auto-generated PDF cache (regenerated at runtime, not source files)
+app/static/cache/
+
+# OneDrive conflict copies (including -Hemant-HP.env secrets)
+*-Hemant-HP*
+*.env
+!.env.example

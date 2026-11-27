@@ -1,0 +1,48 @@
+<header class="admin-header">
+    <div class="admin-header-left">
+        <button class="sidebar-toggle-btn" id="adminSidebarToggle" type="button" aria-label="Toggle Sidebar">
+            <i class="fas fa-bars"></i>
+        </button>
+        {% include 'admin/_breadcrumb.html' %}
+    </div>
+
+    <!-- Unified Global Search Form -->
+    <div class="admin-header-search d-none d-lg-block mx-3" style="flex: 1; max-width: 420px;">
+        <form action="{{ url_for('admin.search') }}" method="GET" class="position-relative">
+            <input type="text" name="q" class="form-control admin-input font-sans py-1 ps-4 pe-3" placeholder="Search students, programs, subjects, topics, materials..." value="{{ request.args.get('q', '') }}" style="font-size: 0.82rem; height: 34px; border-radius: 6px;">
+            <i class="fas fa-search position-absolute top-50 start-0 translate-middle-y ms-2.5 text-muted" style="font-size: 0.8rem; margin-left: 10px;"></i>
+        </form>
+    </div>
+
+    <div class="admin-header-right">
+        <div class="d-flex align-items-center gap-2">
+            <a href="{{ url_for('admin.search') }}" class="btn btn-admin-secondary btn-admin-sm d-lg-none" title="Global Search">
+                <i class="fas fa-search text-primary"></i>
+            </a>
+            <a href="{{ url_for('admin.profile') }}" class="btn btn-admin-secondary btn-admin-sm" title="Admin Profile &amp; Security">
+                <i class="fas fa-user-shield text-primary"></i>
+                <span class="d-none d-md-inline ms-1">Profile</span>
+            </a>
+            <a href="{{ url_for('admin.health') }}" class="btn btn-admin-secondary btn-admin-sm" title="System Telemetry &amp; Health">
+                <i class="fas fa-heartbeat text-success"></i>
+                <span class="d-none d-md-inline ms-1">Live</span>
+            </a>
+            <a href="{{ url_for('auth.logout') }}" class="btn btn-admin-danger btn-admin-sm">
+                <i class="fas fa-sign-out-alt"></i>
+                <span class="d-none d-md-inline ms-1">Logout</span>
+            </a>
+        </div>
+    </div>
+</header>
+
+{% if session.get('impersonating_student_id') %}
+<div class="impersonation-bar">
+    <div class="d-flex align-items-center gap-2">
+        <i class="fas fa-user-secret"></i>
+        <span>IMPERSONATION MODE: Viewing app as student <strong>{{ current_user.full_name or current_user.email }}</strong></span>
+    </div>
+    <a href="{{ url_for('admin.exit_impersonate') }}" class="btn-exit">
+        <i class="fas fa-times-circle me-1"></i> Exit Impersonation Mode
+    </a>
+</div>
+{% endif %}

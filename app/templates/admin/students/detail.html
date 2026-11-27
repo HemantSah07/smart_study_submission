@@ -1,0 +1,352 @@
+{% extends 'admin/admin_base.html' %}
+{% block title %}{{ student.full_name or student.email }} — Student Detail{% endblock %}
+
+{% block breadcrumb_items %}
+    <a href="{{ url_for('admin.students') }}">Student Directory</a>
+    <span class="sep"><i class="fas fa-chevron-right"></i></span>
+    <span class="active-item">{{ student.full_name or student.email }}</span>
+{% endblock %}
+
+{% block admin_content %}
+<!-- Header Bar with Actions -->
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+    <div class="d-flex align-items-center gap-3">
+        <a href="{{ url_for('admin.students') }}" class="btn btn-admin btn-admin-secondary btn-admin-sm">
+            <i class="fas fa-arrow-left"></i> Back
+        </a>
+        <div>
+            <div class="d-flex align-items-center gap-2">
+                <h1 class="h3 fw-bold text-white mb-0">{{ student.full_name or 'Unnamed Student' }}</h1>
+                {% if student.is_active %}
+                    <span class="badge-status active"><i class="fas fa-check-circle"></i> Active</span>
+                {% else %}
+                    <span class="badge-status error"><i class="fas fa-ban"></i> Suspended</span>
+                {% endif %}
+            </div>
+            <div class="text-muted small mt-1">
+                <i class="fas fa-envelope me-1"></i> {{ student.email }} &bull; 
+                Registered: {{ student.date_registered.strftime('%b %d, %Y') if student.date_registered else 'N/A' }}
+            </div>
+        </div>
+    </div>
+
+    <!-- Safe Admin Action Toolbar -->
+    <div class="d-flex flex-wrap gap-2">
+        <form action="{{ url_for('admin.impersonate', student_id=student.id) }}" method="POST">
+            <button type="submit" class="btn btn-admin btn-admin-secondary btn-admin-sm text-warning" title="View app as student">
+                <i class="fas fa-user-secret me-1"></i> Impersonate
+            </button>
+        </form>
+
+        <form action="{{ url_for('admin.student_run_ml', student_id=student.id) }}" method="POST">
+            <button type="submit" class="btn btn-admin btn-admin-secondary btn-admin-sm text-info" title="Re-calculate ML performance risk">
+                <i class="fas fa-robot me-1"></i> Re-run ML
+            </button>
+        </form>
+
+        <button type="button" class="btn btn-admin btn-admin-secondary btn-admin-sm" data-bs-toggle="modal" data-bs-target="#scheduleModal">
+            <i class="fas fa-calendar-alt text-primary me-1"></i> Clear Schedule
+        </button>
+
+        <button type="button" class="btn btn-admin btn-admin-secondary btn-admin-sm" data-bs-toggle="modal" data-bs-target="#resetAssessmentModal">
+            <i class="fas fa-rotate-left text-warning me-1"></i> Reset Assessment
+        </button>
+
+        <form action="{{ url_for('admin.student_toggle_active', student_id=student.id) }}" method="POST" class="d-inline">
+            {% if student.is_active %}
+            <button type="submit" class="btn btn-admin btn-admin-danger btn-admin-sm" onclick="return confirm('Are you sure you want to suspend this student account?')">
+                <i class="fas fa-user-slash me-1"></i> Suspend Account
+            </button>
+            {% else %}
+            <button type="submit" class="btn btn-admin btn-admin-primary btn-admin-sm">
+                <i class="fas fa-user-check me-1"></i> Restore Account
+            </button>
+            {% endif %}
+        </form>
+
+        {% if current_user.is_super_admin %}
+        <button type="button" class="btn btn-danger btn-admin-sm fw-bold" data-bs-toggle="modal" data-bs-target="#permanentDeleteStudentModal">
+            <i class="fas fa-trash-alt me-1"></i> Permanently Delete
+        </button>
+
+        <!-- Permanent Delete Student Modal (Super Admin Only) -->
+        <div class="modal fade text-start" id="permanentDeleteStudentModal" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content bg-dark text-white border-danger shadow-lg">
+                    <div class="modal-header border-bottom border-danger bg-danger bg-opacity-25">
+                        <h5 class="modal-title text-danger fw-bold"><i class="fas fa-exclamation-triangle me-2"></i>Permanently Delete Student Account?</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="alert alert-danger bg-danger bg-opacity-10 border-danger text-white mb-3 small">
+                            <strong>THIS ACTION IS IRREVERSIBLE.</strong> The student account for <strong class="text-warning">{{ student.email }}</strong> and all associated academic records (predictions, study logs, assessment history, uploaded files) will be permanently destroyed.
+                        </div>
+                        <p class="small text-muted mb-2">To confirm permanent deletion, type the exact student email below:</p>
+                        <code class="d-block mb-3 p-2 bg-black rounded text-info font-monospace text-center fs-6 user-select-all">{{ student.email }}</code>
+                        
+                        <form method="POST" action="{{ url_for('admin.delete_permanent_student', student_id=student.id) }}">
+                            <div class="mb-3">
+                                <input type="text" id="confirmStudentEmailInput" name="confirm_text" class="form-control bg-dark border-secondary text-white font-monospace text-center confirm-student-input" data-target="{{ student.email }}" placeholder="Type student email to confirm" autocomplete="off" required>
+                            </div>
+                            <div class="d-flex justify-content-end gap-2">
+                                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                                <button type="submit" id="confirmStudentDeleteBtn" class="btn btn-danger btn-sm fw-bold" disabled style="opacity: 0.5; cursor: not-allowed; pointer-events: none;">
+                                    <i class="fas fa-trash-alt me-1"></i> Permanently Delete Student
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const input = document.getElementById('confirmStudentEmailInput');
+            if (input && typeof handleConfirmDeleteInput === 'function') {
+                handleConfirmDeleteInput(input);
+            }
+        });
+        </script>
+        {% endif %}
+    </div>
+</div>
+
+
+<!-- Grid Layout -->
+<div class="row g-3 mb-4">
+    <!-- Personal & Academic Profile Card -->
+    <div class="col-lg-4">
+        <div class="admin-card h-100 mb-0">
+            <div class="admin-card-header">
+                <h2 class="admin-card-title"><i class="fas fa-id-card"></i> Academic Profile</h2>
+            </div>
+            {% if profile %}
+            <div class="d-flex flex-column gap-2" style="font-size: 0.85rem;">
+                <div class="d-flex justify-content-between py-2 border-bottom border-secondary-subtle">
+                    <span class="text-muted">Education Level</span>
+                    <span class="fw-semibold text-white">{{ profile.study_level or 'Not specified' }}</span>
+                </div>
+                <div class="d-flex justify-content-between py-2 border-bottom border-secondary-subtle">
+                    <span class="text-muted">Program</span>
+                    <span class="fw-semibold text-white text-truncate" style="max-width: 180px;">{{ profile.program or 'Not specified' }}</span>
+                </div>
+                <div class="d-flex justify-content-between py-2 border-bottom border-secondary-subtle">
+                    <span class="text-muted">Semester</span>
+                    <span class="fw-semibold text-white">{{ profile.semester or 'Not specified' }}</span>
+                </div>
+                <div class="d-flex justify-content-between py-2 border-bottom border-secondary-subtle">
+                    <span class="text-muted">University</span>
+                    <span class="fw-semibold text-white text-truncate" style="max-width: 180px;">{{ profile.university or 'Not specified' }}</span>
+                </div>
+                <div class="d-flex justify-content-between py-2 border-bottom border-secondary-subtle">
+                    <span class="text-muted">Country</span>
+                    <span class="fw-semibold text-white">{{ profile.country or 'Nepal' }}</span>
+                </div>
+                <div class="d-flex justify-content-between py-2 border-bottom border-secondary-subtle">
+                    <span class="text-muted">Cumulative GPA</span>
+                    <span class="fw-semibold text-white">{{ profile.cumulative_gpa if profile.cumulative_gpa is not none else 'N/A' }}</span>
+                </div>
+                <div class="d-flex justify-content-between py-2 border-bottom border-secondary-subtle">
+                    <span class="text-muted">Attendance Rate</span>
+                    <span class="fw-semibold text-white">{{ profile.attendance_pct if profile.attendance_pct is not none else '85' }}%</span>
+                </div>
+                <div class="d-flex justify-content-between py-2">
+                    <span class="text-muted">Diagnostic Assessment</span>
+                    {% if profile.has_completed_assessment %}
+                        <span class="badge-status active"><i class="fas fa-check"></i> Completed</span>
+                    {% else %}
+                        <span class="badge-status warning"><i class="fas fa-clock"></i> Pending</span>
+                    {% endif %}
+                </div>
+            </div>
+            {% else %}
+            <div class="text-muted small py-4 text-center">No profile details configured for this student.</div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- ML Performance Risk & Assessment History -->
+    <div class="col-lg-4">
+        <div class="admin-card h-100 mb-0">
+            <div class="admin-card-header">
+                <h2 class="admin-card-title"><i class="fas fa-microchip"></i> ML Risk & Telemetry</h2>
+            </div>
+            {% if latest_prediction %}
+            <div class="p-3 rounded mb-3" style="background: rgba(255,255,255,0.02); border: 1px solid var(--admin-border);">
+                <div class="text-muted small fw-semibold">PREDICTED ACADEMIC RISK</div>
+                <div class="d-flex align-items-center justify-content-between mt-2">
+                    <span class="fs-4 fw-bold text-uppercase {% if latest_prediction.predicted_risk_level == 'high' %}text-danger{% elif latest_prediction.predicted_risk_level == 'medium' %}text-warning{% else %}text-success{% endif %}">
+                        <i class="fas fa-triangle-exclamation me-1"></i> {{ latest_prediction.predicted_risk_level or 'Low' }}
+                    </span>
+                    <span class="badge-status info">Grade: {{ latest_prediction.predicted_grade or 'B+' }}</span>
+                </div>
+                <div class="text-dim mt-2" style="font-size: 0.72rem;">Last predicted: {{ latest_prediction.date.strftime('%b %d, %Y %H:%M') if latest_prediction.date else 'N/A' }}</div>
+            </div>
+            {% else %}
+            <div class="p-3 rounded mb-3 text-center text-muted small" style="background: rgba(255,255,255,0.02); border: 1px solid var(--admin-border);">
+                No ML predictions logged yet. Click "Re-run ML" to calculate performance risk.
+            </div>
+            {% endif %}
+
+            <div class="border-top border-secondary-subtle pt-3">
+                <div class="fw-semibold text-white small mb-2"><i class="fas fa-book-bookmark me-1 text-primary"></i> Enrolled Subjects ({{ subjects|length }})</div>
+                {% if subjects %}
+                <div class="d-flex flex-wrap gap-1.5" style="max-height: 140px; overflow-y: auto;">
+                    {% for ss in subjects %}
+                    <span class="badge bg-secondary-subtle text-white border border-secondary px-2 py-1 small">{{ ss.subject.name }}</span>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="text-muted small">No subjects assigned.</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Study Activity Summary & Documents -->
+    <div class="col-lg-4">
+        <div class="admin-card h-100 mb-0">
+            <div class="admin-card-header">
+                <h2 class="admin-card-title"><i class="fas fa-clock-rotate-left"></i> Study & Material Activity</h2>
+            </div>
+            <div class="row g-2 text-center mb-3">
+                <div class="col-6">
+                    <div class="p-2.5 rounded" style="background: rgba(255,255,255,0.03); border: 1px solid var(--admin-border);">
+                        <div class="text-muted small">Study Logs</div>
+                        <div class="fs-4 fw-bold text-white mt-1">{{ total_study_logs }}</div>
+                    </div>
+                </div>
+                <div class="col-6">
+                    <div class="p-2.5 rounded" style="background: rgba(255,255,255,0.03); border: 1px solid var(--admin-border);">
+                        <div class="text-muted small">Total Hours</div>
+                        <div class="fs-4 fw-bold text-primary mt-1">{{ total_study_hours }}</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="border-top border-secondary-subtle pt-3">
+                <div class="fw-semibold text-white small mb-2"><i class="fas fa-file-pdf me-1 text-info"></i> Uploaded Documents ({{ academic_docs|length + uploaded_materials|length }})</div>
+                {% if academic_docs or uploaded_materials %}
+                <div class="d-flex flex-column gap-1.5" style="max-height: 120px; overflow-y: auto; font-size: 0.8rem;">
+                    {% for doc in academic_docs %}
+                    <div class="text-truncate text-muted"><i class="fas fa-file-lines me-1 text-primary"></i> {{ doc.document_name or doc.file_path }}</div>
+                    {% endfor %}
+                    {% for mat in uploaded_materials %}
+                    <div class="text-truncate text-muted"><i class="fas fa-file-alt me-1 text-info"></i> {{ mat.filename }}</div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="text-muted small">No uploaded materials found.</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Bottom Section: Assessment Results & Audit History -->
+<div class="row g-3">
+    <!-- Assessment History Table -->
+    <div class="col-lg-7">
+        <div class="admin-card mb-0">
+            <div class="admin-card-header">
+                <h2 class="admin-card-title"><i class="fas fa-list-check"></i> Assessment History</h2>
+            </div>
+            {% if assessments %}
+            <div class="admin-table-container">
+                <table class="admin-table">
+                    <thead>
+                        <tr>
+                            <th>Subject</th>
+                            <th>Weighted Score</th>
+                            <th>Knowledge Tier</th>
+                            <th>Completed Date</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for a in assessments %}
+                        <tr>
+                            <td class="fw-semibold text-white">{{ a.subject.name if a.subject else 'Subject #' ~ a.subject_id }}</td>
+                            <td><span class="text-primary fw-bold">{{ a.weighted_score | round(1) }}%</span></td>
+                            <td><span class="badge-status info">{{ a.knowledge_tier or 'Standard' }}</span></td>
+                            <td class="text-muted small">{{ a.completed_at.strftime('%b %d, %Y') if a.completed_at else '—' }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="text-center py-4 text-muted small">No assessment records logged for this student.</div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Admin Actions Audit Log for this student -->
+    <div class="col-lg-5">
+        <div class="admin-card mb-0">
+            <div class="admin-card-header">
+                <h2 class="admin-card-title"><i class="fas fa-shield"></i> Account Audit History</h2>
+            </div>
+            {% if student_logs %}
+            <div class="d-flex flex-column gap-2" style="max-height: 220px; overflow-y: auto;">
+                {% for log in student_logs %}
+                <div class="p-2 rounded" style="background: rgba(255,255,255,0.02); border: 1px solid var(--admin-border); font-size: 0.8rem;">
+                    <div class="d-flex justify-content-between text-muted mb-0.5">
+                        <strong class="text-primary">{{ log.action }}</strong>
+                        <span class="text-dim" style="font-size: 0.7rem;">{{ log.timestamp.strftime('%b %d, %H:%M') }}</span>
+                    </div>
+                    <div class="text-truncate">{{ log.detail or 'Admin action executed' }}</div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="text-center py-4 text-muted small">No specific admin audit records for this account.</div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Clear Schedule Confirmation -->
+<div class="modal fade admin-modal" id="scheduleModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold text-white"><i class="fas fa-calendar-xmark text-warning me-2"></i> Clear Study Schedule</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body text-muted small">
+                Are you sure you want to clear the study plan for <strong>{{ student.full_name or student.email }}</strong>?
+                The student's next visit to their Planner will generate a fresh schedule based on their current parameters.
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-admin btn-admin-secondary btn-admin-sm" data-bs-dismiss="modal">Cancel</button>
+                <form action="{{ url_for('admin.student_regenerate_schedule', student_id=student.id) }}" method="POST">
+                    <button type="submit" class="btn btn-admin btn-admin-primary btn-admin-sm">Confirm Clear Schedule</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Reset Assessment Confirmation -->
+<div class="modal fade admin-modal" id="resetAssessmentModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold text-white"><i class="fas fa-rotate-left text-warning me-2"></i> Reset Diagnostic Assessment</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body text-muted small">
+                Are you sure you want to reset the diagnostic assessment flag for <strong>{{ student.full_name or student.email }}</strong>?
+                This allows the student to retake their initial assessment from fresh.
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-admin btn-admin-secondary btn-admin-sm" data-bs-dismiss="modal">Cancel</button>
+                <form action="{{ url_for('admin.student_reset_assessment', student_id=student.id) }}" method="POST">
+                    <button type="submit" class="btn btn-admin btn-admin-warning btn-admin-sm">Confirm Reset Flag</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

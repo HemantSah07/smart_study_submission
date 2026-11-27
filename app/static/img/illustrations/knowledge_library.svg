@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 400" fill="none">
+  <defs>
+    <linearGradient id="lib-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#34d399" stop-opacity="0.8"/>
+      <stop offset="100%" stop-color="#22d3ee" stop-opacity="0.8"/>
+    </linearGradient>
+    <filter id="lib-glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="25" result="blur"/>
+    </filter>
+  </defs>
+
+  <circle cx="300" cy="200" r="140" fill="url(#lib-grad)" filter="url(#lib-glow)" opacity="0.35"/>
+
+  <!-- Stacked Books Graphic -->
+  <g transform="translate(200, 140)">
+    <rect x="0" y="80" width="200" height="30" rx="6" fill="rgba(15,23,42,0.9)" stroke="#34d399" stroke-width="2"/>
+    <rect x="15" y="45" width="170" height="28" rx="6" fill="rgba(15,23,42,0.9)" stroke="#22d3ee" stroke-width="2"/>
+    <rect x="30" y="10" width="140" height="28" rx="6" fill="rgba(15,23,42,0.9)" stroke="#6366f1" stroke-width="2"/>
+
+    <!-- Bookmark Ribbons -->
+    <path d="M160 80 V120 L170 110 L180 120 V80 Z" fill="#34d399"/>
+    <path d="M140 45 V80 L148 72 L156 80 V45 Z" fill="#22d3ee"/>
+  </g>
+</svg>

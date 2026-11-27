@@ -1,0 +1,7 @@
+<div class="admin-breadcrumb">
+    <a href="{{ url_for('admin.dashboard') }}"><i class="fas fa-home me-1"></i> Admin</a>
+    <span class="sep"><i class="fas fa-chevron-right"></i></span>
+    {% block breadcrumb_items %}
+        <span class="active-item">{% block page_title %}Dashboard{% endblock %}</span>
+    {% endblock %}
+</div>

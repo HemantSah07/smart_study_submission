@@ -1,0 +1,177 @@
+{% extends 'admin/admin_base.html' %}
+{% block title %}Learning Materials Directory — Content Management{% endblock %}
+
+{% block breadcrumb_items %}
+    <a href="{{ url_for('admin.content_stats') }}">Content</a>
+    <span class="sep"><i class="fas fa-chevron-right"></i></span>
+    <span class="active-item">Learning Materials</span>
+{% endblock %}
+
+{% block admin_content %}
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+    <div>
+        <h1 class="h3 fw-bold text-white mb-1"><i class="fas fa-book-journal-whills me-2 text-primary"></i> Learning Materials Directory</h1>
+        <p class="text-muted small mb-0">Search, filter, inspect, and test student Read & Study links and PDF generation for all syllabus topics.</p>
+    </div>
+    <div class="d-flex gap-2">
+        <a href="{{ url_for('admin.content_stats') }}" class="btn btn-admin btn-admin-secondary btn-admin-sm">
+            <i class="fas fa-chart-pie me-1"></i> Content Overview
+        </a>
+    </div>
+</div>
+
+<!-- Search & Filter Card -->
+<div class="admin-card p-3 mb-4">
+    <form method="GET" action="{{ url_for('admin.content_materials') }}" class="row g-2">
+        <!-- Search input -->
+        <div class="col-12 col-md-4">
+            <label class="form-label text-muted small fw-semibold mb-1">Search Keywords</label>
+            <div class="input-group">
+                <span class="input-group-text admin-form-control border-end-0 text-muted"><i class="fas fa-search"></i></span>
+                <input type="text" name="q" value="{{ q or '' }}" class="form-control admin-form-control border-start-0" placeholder="Title, topic or content keywords...">
+            </div>
+        </div>
+
+        <!-- Subject Filter -->
+        <div class="col-12 col-md-3">
+            <label class="form-label text-muted small fw-semibold mb-1">Subject</label>
+            <select name="subject_id" class="form-select admin-form-control">
+                <option value="">-- All Subjects --</option>
+                {% for s in subjects %}
+                <option value="{{ s.id }}" {% if subject_id == s.id %}selected{% endif %}>{{ s.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <!-- Level Filter -->
+        <div class="col-12 col-md-2">
+            <label class="form-label text-muted small fw-semibold mb-1">Level</label>
+            <select name="level" class="form-select admin-form-control">
+                <option value="">-- All Levels --</option>
+                {% for lvl in levels %}
+                <option value="{{ lvl.name }}" {% if level == lvl.name %}selected{% endif %}>{{ lvl.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <!-- Difficulty Filter -->
+        <div class="col-12 col-md-2">
+            <label class="form-label text-muted small fw-semibold mb-1">Difficulty</label>
+            <select name="difficulty" class="form-select admin-form-control">
+                <option value="">-- All --</option>
+                <option value="Easy" {% if difficulty == 'Easy' %}selected{% endif %}>Easy</option>
+                <option value="Medium" {% if difficulty == 'Medium' %}selected{% endif %}>Medium</option>
+                <option value="Hard" {% if difficulty == 'Hard' %}selected{% endif %}>Hard</option>
+            </select>
+        </div>
+
+        <!-- Filter Submit -->
+        <div class="col-12 col-md-1 align-self-end">
+            <button type="submit" class="btn btn-admin btn-admin-primary btn-admin-sm w-100 justify-content-center">
+                Filter
+            </button>
+        </div>
+    </form>
+</div>
+
+<!-- Data Table -->
+<div class="admin-table-container mb-4">
+    <table class="admin-table">
+        <thead>
+            <tr>
+                <th class="ps-4">Material Title</th>
+                <th>Subject</th>
+                <th>Topic / Chapter</th>
+                <th>Est. Reading Time</th>
+                <th>Difficulty</th>
+                <th>Student Access</th>
+                <th class="pe-4 text-end">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for m in materials %}
+            <tr>
+                <td class="ps-4">
+                    <div class="fw-bold text-white fs-6">{{ m.title }}</div>
+                    <div class="text-dim small">ID #{{ m.id }} &bull; Topic #{{ m.topic_id }}</div>
+                </td>
+                <td>
+                    {% if m.subject_obj %}
+                    <span class="badge bg-primary-subtle text-primary border border-primary-subtle px-2 py-1">{{ m.subject_obj.name }}</span>
+                    {% else %}
+                    <span class="text-dim small">—</span>
+                    {% endif %}
+                </td>
+                <td>
+                    <div class="small text-white fw-semibold">{{ m.topic_obj.name if m.topic_obj else 'Topic #' ~ m.topic_id }}</div>
+                    {% if m.chapter_obj %}
+                    <div class="text-dim small">Ch {{ m.chapter_obj.chapter_number }}: {{ m.chapter_obj.name }}</div>
+                    {% endif %}
+                </td>
+                <td class="small text-muted">
+                    <i class="fas fa-clock text-primary me-1"></i> {{ m.estimated_reading_time or 10 }} mins
+                </td>
+                <td>
+                    <span class="badge bg-secondary-subtle text-white border border-secondary px-2 py-1">{{ m.difficulty_level or 'Medium' }}</span>
+                </td>
+                <td>
+                    <span class="badge-status active"><i class="fas fa-check-circle"></i> Ready &amp; Readable</span>
+                </td>
+                <td class="pe-4 text-end">
+                    <div class="d-inline-flex gap-1">
+                        <!-- Preview button -->
+                        <a href="{{ url_for('admin.content_material_preview', material_id=m.id) }}" class="btn btn-admin btn-admin-secondary btn-admin-sm">
+                            <i class="fas fa-eye"></i> Preview
+                        </a>
+                        
+                        <!-- Student Read & Study link -->
+                        {% if m.subject_obj %}
+                        <a href="{{ url_for('student.study_subject', subject_id=m.subject_obj.id) }}" target="_blank" class="btn btn-admin btn-admin-secondary btn-admin-sm text-info" title="Open Student Read & Study reader">
+                            <i class="fas fa-book-open"></i> Read
+                        </a>
+                        {% endif %}
+
+                        <!-- PDF Download test link -->
+                        {% if m.topic_id %}
+                        <a href="{{ url_for('student.get_chapter_pdf', topic_id=m.topic_id) }}" target="_blank" class="btn btn-admin btn-admin-secondary btn-admin-sm text-success" title="Download Topic PDF">
+                            <i class="fas fa-file-pdf"></i> PDF
+                        </a>
+                        {% endif %}
+
+                    </div>
+                </td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="7" class="text-center py-5 text-muted">
+                    <i class="fas fa-book-open fs-2 text-dim mb-2 d-block"></i>
+                    No learning materials found matching the search criteria.
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<!-- Pagination -->
+{% if pagination and pagination.pages > 1 %}
+<div class="d-flex align-items-center justify-content-between">
+    <div class="text-muted small">
+        Showing page {{ page }} of {{ pagination.pages }} ({{ total_materials }} total records)
+    </div>
+    <div class="d-flex gap-1">
+        {% if pagination.has_prev %}
+        <a href="{{ url_for('admin.content_materials', page=page-1, q=q, subject_id=subject_id, level=level, difficulty=difficulty) }}" class="btn btn-admin btn-admin-secondary btn-admin-sm">
+            <i class="fas fa-chevron-left"></i> Previous
+        </a>
+        {% endif %}
+        
+        {% if pagination.has_next %}
+        <a href="{{ url_for('admin.content_materials', page=page+1, q=q, subject_id=subject_id, level=level, difficulty=difficulty) }}" class="btn btn-admin btn-admin-secondary btn-admin-sm">
+            Next <i class="fas fa-chevron-right"></i>
+        </a>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+{% endblock %}

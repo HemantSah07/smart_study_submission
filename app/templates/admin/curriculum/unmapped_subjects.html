@@ -1,0 +1,86 @@
+{% extends 'admin/admin_base.html' %}
+{% block title %}Unmapped Subjects — Curriculum Management{% endblock %}
+
+{% block breadcrumb_items %}
+    <a href="{{ url_for('admin.curriculum_levels') }}">Curriculum</a>
+    <span class="sep"><i class="fas fa-chevron-right"></i></span>
+    <a href="{{ url_for('admin.curriculum_subjects') }}">Subjects Catalog</a>
+    <span class="sep"><i class="fas fa-chevron-right"></i></span>
+    <span class="active-item">Unmapped Subjects</span>
+{% endblock %}
+
+{% block admin_content %}
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+    <div>
+        <h1 class="h3 fw-bold text-white mb-1"><i class="fas fa-link-slash me-2 text-warning"></i> Unmapped Global Subjects</h1>
+        <p class="text-muted small mb-0">Global subjects that currently have no active <strong>ProgramSubject</strong> mapping to any academic program.</p>
+    </div>
+    <div class="d-flex gap-2">
+        <a href="{{ url_for('admin.curriculum_import') }}" class="btn btn-admin btn-admin-primary btn-admin-sm">
+            <i class="fas fa-file-import me-1"></i> Import Syllabus Document
+        </a>
+    </div>
+</div>
+
+<div class="admin-card p-0">
+    <div class="admin-card-header px-4 py-3 mb-0">
+        <h2 class="admin-card-title fs-6"><i class="fas fa-list text-warning"></i> Unmapped Subjects Directory ({{ unmapped_subjects|length }})</h2>
+    </div>
+
+    {% if unmapped_subjects %}
+    <div class="admin-table-container border-0">
+        <table class="admin-table">
+            <thead>
+                <tr>
+                    <th class="ps-4" style="width: 80px;">ID</th>
+                    <th>Subject Name</th>
+                    <th>Code</th>
+                    <th>Legacy Program Tag</th>
+                    <th>Level</th>
+                    <th class="pe-4 text-center">Attach to Program</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for subj in unmapped_subjects %}
+                <tr>
+                    <td class="ps-4 text-dim font-mono small">#{{ subj.id }}</td>
+                    <td class="fw-bold text-white fs-6">{{ subj.name }}</td>
+                    <td>
+                        {% if subj.code %}
+                        <span class="badge bg-primary-subtle text-primary border border-primary-subtle px-2 py-1 font-mono fw-bold">{{ subj.code }}</span>
+                        {% else %}
+                        <span class="text-dim small">—</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <span class="badge bg-secondary-subtle text-white border border-secondary px-2 py-1">{{ subj.program or 'Unmapped' }}</span>
+                    </td>
+                    <td class="small text-muted">{{ subj.level_of_study or 'N/A' }}</td>
+                    <td class="pe-4 text-center">
+                        <form method="POST" action="{{ url_for('admin.unmapped_subjects_attach', subject_id=subj.id) }}" class="d-inline-flex gap-2 align-items-center justify-content-center">
+                            <select name="program_id" class="form-select admin-form-control" style="max-width: 220px;" required>
+                                <option value="">-- Choose Program --</option>
+                                {% for p in all_programs %}
+                                <option value="{{ p.id }}">{{ p.name }} ({{ p.level_name }})</option>
+                                {% endfor %}
+                            </select>
+                            <input type="text" name="semester" class="form-control admin-form-control" style="max-width: 130px;" placeholder="Semester 1">
+                            <button type="submit" class="btn btn-admin btn-admin-primary btn-admin-sm">
+                                <i class="fas fa-link me-1"></i> Attach
+                            </button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="p-5 text-center text-muted">
+        <i class="fas fa-circle-check fs-1 text-success mb-3 d-block"></i>
+        <h3 class="h5 fw-bold text-white mb-1">All Subjects Mapped</h3>
+        <p class="small text-muted mb-0">Every global subject in the database is attached to at least one Curriculum Program!</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,140 @@
+{% extends 'admin/admin_base.html' %}
+{% block title %}Copy Subjects Preview — {{ prog.name }}{% endblock %}
+
+{% block breadcrumb_items %}
+    <a href="{{ url_for('admin.curriculum_levels') }}">Curriculum</a>
+    <span class="sep"><i class="fas fa-chevron-right"></i></span>
+    <a href="{{ url_for('admin.curriculum_programs') }}">Programs</a>
+    <span class="sep"><i class="fas fa-chevron-right"></i></span>
+    <a href="{{ url_for('admin.curriculum_program_detail', prog_id=prog.id) }}">{{ prog.name }}</a>
+    <span class="sep"><i class="fas fa-chevron-right"></i></span>
+    <span class="active-item">Copy Preview</span>
+{% endblock %}
+
+{% block admin_content %}
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+    <div>
+        <h1 class="h3 fw-bold text-white mb-1"><i class="fas fa-copy me-2 text-primary"></i> Copy Subjects Preview</h1>
+        <p class="text-muted small mb-0">
+            Previewing subject copy from <strong class="text-white">{{ source_prog.name }}</strong> into <strong class="text-white">{{ prog.name }}</strong>.
+        </p>
+    </div>
+    <div>
+        <a href="{{ url_for('admin.curriculum_program_detail', prog_id=prog.id) }}" class="btn btn-admin btn-admin-secondary btn-admin-sm">
+            <i class="fas fa-arrow-left me-1"></i> Back to Program Detail
+        </a>
+    </div>
+</div>
+
+<div class="row g-3 mb-4">
+    <!-- New Mappings Card -->
+    <div class="col-lg-7">
+        <div class="admin-card h-100 mb-0">
+            <div class="admin-card-header">
+                <h2 class="admin-card-title"><i class="fas fa-plus-circle text-success"></i> New Subjects to Copy</h2>
+                <span class="badge-status active">{{ new_mappings|length }} new</span>
+            </div>
+            {% if new_mappings %}
+            <div class="admin-table-container">
+                <table class="admin-table">
+                    <thead>
+                        <tr>
+                            <th class="ps-4">Subject Name</th>
+                            <th>Code</th>
+                            <th>Source Semester</th>
+                            <th>Credits</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for m in new_mappings %}
+                        <tr>
+                            <td class="ps-4 fw-bold text-white">{{ m.subject.name if m.subject else '(unknown subject)' }}</td>
+                            <td>
+                                {% if m.subject and m.subject.code %}
+                                <span class="badge bg-primary-subtle text-primary border border-primary-subtle px-2 py-1 font-mono fw-bold">{{ m.subject.code }}</span>
+                                {% else %}
+                                <span class="text-dim small">—</span>
+                                {% endif %}
+                            </td>
+                            <td class="small text-muted">{{ m.semester or 'Unassigned' }}</td>
+                            <td class="small text-white fw-semibold">{{ m.subject.credit_hours if m.subject else 3 }} Cr</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="text-center py-4 text-muted small">
+                <i class="fas fa-info-circle me-1 text-primary"></i> No new subjects found — all subjects from {{ source_prog.name }} are already attached to {{ prog.name }}.
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Existing Duplicate Mappings Card -->
+    <div class="col-lg-5">
+        <div class="admin-card h-100 mb-0">
+            <div class="admin-card-header">
+                <h2 class="admin-card-title"><i class="fas fa-triangle-exclamation text-warning"></i> Already Mapped Subjects</h2>
+                <span class="badge-status warning">{{ existing_mappings|length }} existing</span>
+            </div>
+            {% if existing_mappings %}
+            <div class="small text-muted mb-3">
+                These subjects are already attached to {{ prog.name }} and will be handled according to your conflict resolution choice below.
+            </div>
+            <div class="d-flex flex-column gap-1.5" style="max-height: 240px; overflow-y: auto;">
+                {% for m in existing_mappings %}
+                <div class="p-2 rounded d-flex align-items-center justify-content-between" style="background: rgba(255,255,255,0.02); border: 1px solid var(--admin-border); font-size: 0.82rem;">
+                    <span class="fw-semibold text-white">{{ m.subject.name if m.subject else '(unknown)' }}</span>
+                    <span class="badge-status warning"><i class="fas fa-check"></i> Present</span>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="text-center py-4 text-muted small">
+                <i class="fas fa-circle-check text-success me-1"></i> No duplicate conflicts detected.
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Confirm Form Card -->
+<div class="admin-card">
+    <div class="admin-card-header">
+        <h2 class="admin-card-title"><i class="fas fa-check-double text-primary"></i> Confirm Copy Action</h2>
+    </div>
+    <form method="POST" action="{{ url_for('admin.curriculum_program_copy_confirm', prog_id=prog.id) }}">
+        <input type="hidden" name="source_program_id" value="{{ source_prog.id }}">
+        
+        <div class="mb-3" style="max-width: 450px;">
+            <label class="form-label text-muted small fw-semibold">Conflict Resolution for Duplicate Mappings</label>
+            <select name="conflict_mode" class="form-select admin-form-control">
+                <option value="skip" selected>Skip (keep existing target semester data)</option>
+                <option value="replace">Replace (overwrite target semester data with source semester data)</option>
+            </select>
+        </div>
+
+        {% if new_mappings %}
+        <div class="p-3 rounded mb-3" style="background: rgba(16, 185, 129, 0.12); border: 1px solid var(--admin-success); font-size: 0.88rem;">
+            <i class="fas fa-check-circle text-success me-1"></i>
+            <strong>Ready to copy:</strong> {{ new_mappings|length }} new subject mapping(s) will be attached to {{ prog.name }}.
+        </div>
+        {% else %}
+        <div class="p-3 rounded mb-3" style="background: rgba(245, 158, 11, 0.12); border: 1px solid var(--admin-warning); font-size: 0.88rem;">
+            <i class="fas fa-triangle-exclamation text-warning me-1"></i>
+            All subjects from {{ source_prog.name }} already exist in {{ prog.name }}.
+        </div>
+        {% endif %}
+
+        <div class="d-flex gap-2">
+            <a href="{{ url_for('admin.curriculum_program_detail', prog_id=prog.id) }}" class="btn btn-admin btn-admin-secondary">
+                <i class="fas fa-arrow-left me-1"></i> Cancel
+            </a>
+            <button type="submit" class="btn btn-admin btn-admin-primary" {% if not new_mappings and not existing_mappings %}disabled{% endif %}>
+                <i class="fas fa-check me-1"></i> Confirm Copy ({{ new_mappings|length }} new subjects)
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}

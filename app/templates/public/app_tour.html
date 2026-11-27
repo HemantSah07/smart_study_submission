@@ -1,0 +1,90 @@
+{% extends 'base.html' %}
+{% block title %}App Tour — Smart Study{% endblock %}
+
+{% block head %}
+<meta name="description" content="See how Smart Study takes you from understanding your performance to consistently improving — step by step.">
+{% endblock %}
+
+{% block content %}
+<section class="ss-page-hero position-relative text-center overflow-hidden my-3">
+    <div class="ss-page-hero-bg" style="background-image: url('{{ url_for('static', filename='img/ui/public/app-tour.webp') }}');"></div>
+    <div class="ss-page-hero-content py-4">
+        <div class="ss-badge ss-badge-purple mb-3">Product Experience</div>
+        <h1 class="display-5 fw-bold text-white mb-3" style="letter-spacing:-0.03em;">
+            Your Guided Journey to Better Academic Results
+        </h1>
+        <p class="text-muted mx-auto mb-0" style="max-width:600px;font-size:1.05rem;line-height:1.65;">
+            Smart Study is not just a tool — it's a structured academic coaching experience. Here's how it guides you from confusion to clarity.
+        </p>
+    </div>
+</section>
+
+<div class="ss-panel mb-5 p-4 p-md-5">
+    <div class="ss-timeline">
+        <div class="ss-timeline-item">
+            <div class="ss-timeline-dot"></div>
+            <div class="ss-card">
+                <div class="ss-badge ss-badge-cyan mb-2">Phase 1</div>
+                <h5 class="fw-bold text-white mb-2">Understand Yourself</h5>
+                <p class="text-muted small mb-0">Complete your academic profile: your study level, program, subjects, attendance, and target score. Smart Study uses this to personalise everything that follows.</p>
+            </div>
+        </div>
+        <div class="ss-timeline-item">
+            <div class="ss-timeline-dot"></div>
+            <div class="ss-card">
+                <div class="ss-badge ss-badge-purple mb-2">Phase 2</div>
+                <h5 class="fw-bold text-white mb-2">Discover Your Strengths &amp; Weaknesses</h5>
+                <p class="text-muted small mb-0">Take an adaptive assessment that adjusts question difficulty based on your answers. The result is an accurate picture of your current knowledge — per subject, per topic.</p>
+            </div>
+        </div>
+        <div class="ss-timeline-item">
+            <div class="ss-timeline-dot"></div>
+            <div class="ss-card">
+                <div class="ss-badge ss-badge-rose mb-2">Phase 3</div>
+                <h5 class="fw-bold text-white mb-2">Identify What Needs Attention</h5>
+                <p class="text-muted small mb-0">Smart Study analyses your performance and flags subjects at academic risk. You see clear, readable risk indicators — not raw scores — so you know exactly where to focus.</p>
+            </div>
+        </div>
+        <div class="ss-timeline-item">
+            <div class="ss-timeline-dot"></div>
+            <div class="ss-card">
+                <div class="ss-badge ss-badge-emerald mb-2">Phase 4</div>
+                <h5 class="fw-bold text-white mb-2">Build Your Study Plan</h5>
+                <p class="text-muted small mb-0">Generate a personalised weekly study schedule. High-risk subjects automatically get more time. Your availability and exam timeline are factored in automatically.</p>
+            </div>
+        </div>
+        <div class="ss-timeline-item">
+            <div class="ss-timeline-dot"></div>
+            <div class="ss-card">
+                <div class="ss-badge ss-badge-amber mb-2">Phase 5</div>
+                <h5 class="fw-bold text-white mb-2">Study &amp; Practice</h5>
+                <p class="text-muted small mb-0">Follow your plan, access curated study materials for each subject, take chapter quizzes, and ask your AI Study Coach when you're stuck on a topic.</p>
+            </div>
+        </div>
+        <div class="ss-timeline-item">
+            <div class="ss-timeline-dot"></div>
+            <div class="ss-card">
+                <div class="ss-badge ss-badge-cyan mb-2">Phase 6</div>
+                <h5 class="fw-bold text-white mb-2">Track Your Progress</h5>
+                <p class="text-muted small mb-0">Log every study session and watch your consistency build over time. See your weekly hours, session streaks, and total time invested.</p>
+            </div>
+        </div>
+        <div class="ss-timeline-item mb-0">
+            <div class="ss-timeline-dot"></div>
+            <div class="ss-card">
+                <div class="ss-badge ss-badge-purple mb-2">Phase 7</div>
+                <h5 class="fw-bold text-white mb-2">Improve &amp; Excel</h5>
+                <p class="text-muted small mb-0">Re-run your risk analysis after studying. Retake assessments to measure improvement. As your performance improves, your study plan adapts accordingly.</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="ss-action text-center py-5 mb-4">
+    <h3 class="fw-bold text-white mb-3">Ready to transform your study habits?</h3>
+    <a href="{{ url_for('auth.register') }}" class="btn btn-primary px-5 py-3 shadow-lg" style="font-size:1.05rem;font-weight:700;border-radius:12px;">
+        Start Your Journey <i class="fas fa-arrow-right ms-2"></i>
+    </a>
+</div>
+{% endblock %}
+

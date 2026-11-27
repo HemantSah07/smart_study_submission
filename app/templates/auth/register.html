@@ -1,0 +1,968 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<style>
+    .strength-meter { height: 6px; background-color: rgba(255,255,255,0.05); border-radius: 3px; overflow: hidden; transition: all 0.3s ease; }
+    .strength-meter div { height: 100%; width: 0; transition: all 0.3s ease; }
+    .strength-weak { width: 33%; background: var(--neon-red) !important; }
+    .strength-medium { width: 66%; background: var(--neon-yellow) !important; }
+    .strength-strong { width: 100%; background: var(--neon-green) !important; }
+    .step-indicator { display: flex; justify-content: space-between; position: relative; margin-bottom: 2rem; }
+    .step-indicator::before { content: ""; position: absolute; top: 50%; left: 0; right: 0; height: 2px; background: rgba(255,255,255,0.1); transform: translateY(-50%); z-index: 1; }
+    .step-indicator-item { width: 40px; height: 40px; border-radius: 50%; background: #1e1b4b; border: 2px solid rgba(255,255,255,0.1); display: flex; align-items: center; justify-content: center; z-index: 2; font-weight: bold; color: rgba(255,255,255,0.5); transition: all 0.3s ease; }
+    .step-indicator-item.active { background: var(--purple, #6366f1); border-color: var(--purple, #6366f1); color: white; box-shadow: 0 0 15px rgba(99,102,241,0.5); }
+    .step-indicator-item.completed { background: var(--neon-green, #10b981); border-color: var(--neon-green, #10b981); color: white; }
+    .form-step { display: none; }
+    .form-step.active { display: block; animation: fadeIn 0.4s ease-in-out; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    .badge-verified { background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.3); font-weight: bold; }
+</style>
+
+<div class="ss-page my-3">
+    <div class="row g-0 align-items-stretch overflow-hidden rounded-4 border border-secondary shadow-lg" style="background: rgba(10, 15, 30, 0.85); backdrop-filter: blur(20px);">
+        {# Left Side: Cinematic Onboarding Visual #}
+        <div class="col-lg-5 position-relative d-none d-lg-flex flex-column justify-content-between p-5 overflow-hidden">
+            <div class="ss-page-hero-bg" style="background-image: url('{{ url_for('static', filename='img/ui/public/register-hero.webp') }}'); opacity: 0.85;"></div>
+            
+            <div class="position-relative z-2">
+                <a href="{{ url_for('main.home') }}">
+                    <img src="{{ url_for('static', filename='img/brand/smart-study-logo-light.svg') }}" alt="Smart Study Logo" style="height: 44px;">
+                </a>
+            </div>
+
+            <div class="position-relative z-2 my-auto py-4">
+                <div class="ss-badge ss-badge-cyan mb-3">Begin Your Learning Journey</div>
+                <h2 class="display-6 fw-bold text-white mb-3" style="letter-spacing: -0.02em;">
+                    Take Control of Your Academic Future
+                </h2>
+                <p class="text-muted mb-4 lead" style="font-size: 1.05rem; line-height: 1.6;">
+                    Create your account to unlock personalized study schedules, early risk alerts, and AI-assisted revision.
+                </p>
+            </div>
+
+            <div class="position-relative z-2 pt-3 border-top border-secondary text-muted small">
+                © 2026 Smart Study Platform.
+            </div>
+        </div>
+
+        {# Right Side: Onboarding Form Panel #}
+        <div class="col-lg-7 p-4 p-md-5">
+            <div class="text-center d-lg-none mb-4">
+                <img src="{{ url_for('static', filename='img/brand/smart-study-logo-light.svg') }}" alt="Smart Study Logo" style="height: 40px;">
+            </div>
+
+            <div class="mb-4 text-center text-lg-start">
+                <h3 class="fw-bold text-white mb-1">Create Student Account</h3>
+                <p class="text-muted small">Register to start organizing your study plans adaptively</p>
+            </div>
+
+                <!-- Step progress indicators -->
+                <div class="step-indicator" id="stepIndicatorsContainer">
+                    <div class="step-indicator-item active" id="indicator-1">1</div>
+                    <div class="step-indicator-item" id="indicator-2">2</div>
+                    <div class="step-indicator-item" id="indicator-3">3</div>
+                </div>
+
+                <form id="registerForm" method="POST" novalidate autocomplete="off">
+                    
+                    <!-- STEP 1: ACCOUNT DETAILS -->
+                    <div class="form-step active" id="step-panel-1">
+                        <h5 class="fw-bold text-white mb-3" id="stepTitle"><i class="fas fa-user text-primary me-2"></i> Step 1: Account Info</h5>
+                        
+                        <!-- Account Role Selector -->
+                        <div class="mb-4">
+                            <label class="form-label fw-semibold text-white">Account Type *</label>
+                            <div class="btn-group w-100" role="group" id="roleBtnGroup">
+                                <input type="radio" class="btn-check" name="role" id="roleStudent" value="student" checked>
+                                <label class="btn btn-outline-primary py-2 fw-semibold" for="roleStudent">
+                                    <i class="fas fa-user-graduate me-2"></i>Student Account
+                                </label>
+                                
+                                <input type="radio" class="btn-check" name="role" id="roleAdmin" value="admin">
+                                <label class="btn btn-outline-warning py-2 fw-semibold" for="roleAdmin">
+                                    <i class="fas fa-user-shield me-2"></i>Admin Request
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- Admin Request Info Box -->
+                        <div id="adminNoticeBox" class="alert alert-warning border-warning bg-opacity-10 text-white d-none mb-4">
+                            <h6 class="fw-bold text-warning mb-2"><i class="fas fa-shield-alt me-2"></i>Admin Registration Approval Notice</h6>
+                            <p class="small mb-2">
+                                Selecting Admin does <strong>NOT</strong> create an active Admin account immediately.
+                            </p>
+                            <ul class="small mb-0 ps-3">
+                                <li>Your request will be submitted to the Super Admin for review.</li>
+                                <li>Upon Super Admin approval, a single-use 24-hour verification code will be sent to your personal email address.</li>
+                            </ul>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label" id="nameLabel">Full Name *</label>
+                            <input type="text" id="full_name" name="full_name" class="form-control bg-dark border-secondary text-white" placeholder="John Doe" autocomplete="off" required>
+                            <div class="invalid-feedback text-danger small mt-1" id="nameError">Full name must be at least 3 letters (no numbers or special characters).</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label" id="emailLabel">Email Address *</label>
+                            <div class="input-group">
+                                <input type="email" id="email" name="email" class="form-control bg-dark border-secondary text-white" placeholder="name@gmail.com" value="" autocomplete="off" required>
+                                <button type="button" id="sendVerificationBtn" class="btn btn-outline-primary" disabled>Send Verification</button>
+                                <button type="button" id="changeEmailBtn" class="btn btn-outline-secondary d-none">Change</button>
+                            </div>
+                            <small class="text-muted d-block mt-1 d-none" id="adminEmailNotice">
+                                <i class="fas fa-info-circle me-1 text-warning"></i>Your request will be reviewed by the Super Admin. If approved, a verification code will be sent to this email address.
+                            </small>
+                            <div class="invalid-feedback text-danger small mt-1" id="emailError">Please enter a valid, unregistered personal email address.</div>
+                            <div class="text-success small mt-1 d-none" id="verificationSentMsg">Verification email sent. Please check your inbox.</div>
+                            <div class="badge badge-verified py-2 px-3 rounded mt-2 d-none" id="verifiedStatusBadge">✓ Email Verified</div>
+                        </div>
+
+                        <!-- Verification Code Box (Visible only after sending verification code for student) -->
+                        <div class="mb-4 d-none" id="verificationCodeGroup">
+                            <label class="form-label">Verification Code (6 Digits) *</label>
+                            <div class="input-group">
+                                <input type="text" id="verification_code" class="form-control bg-dark border-secondary text-white text-center fs-5 fw-bold" placeholder="000000" maxlength="6" autocomplete="off">
+                                <button type="button" id="verifyCodeBtn" class="btn btn-primary" disabled>Verify Code</button>
+                            </div>
+                            <div class="text-danger small mt-1 d-none" id="codeError">Invalid or expired code. Please try again.</div>
+                        </div>
+
+                        <!-- Admin Request Password Block (Shown only when Admin Request is selected) -->
+                        <div id="adminPasswordGroup" class="d-none mt-3">
+                            <div class="mb-3">
+                                <label class="form-label">Password *</label>
+                                <div class="input-group">
+                                    <input type="password" id="admin_password" name="admin_password" class="form-control bg-dark border-secondary text-white" placeholder="Min 8 characters" autocomplete="new-password">
+                                    <button class="btn btn-outline-primary border-secondary" type="button" id="toggleAdminPassword" style="border-top-right-radius: 10px; border-bottom-right-radius: 10px;">👁️</button>
+                                </div>
+                                <div class="invalid-feedback text-danger small mt-1" id="adminPasswordError">Must contain 8 chars, 1 uppercase, 1 lowercase, 1 number, 1 special character.</div>
+                            </div>
+                            
+                            <div class="mb-4">
+                                <label class="form-label">Confirm Password *</label>
+                                <div class="input-group">
+                                    <input type="password" id="admin_confirm_password" name="admin_confirm_password" class="form-control bg-dark border-secondary text-white" placeholder="Confirm your password" autocomplete="new-password">
+                                    <span class="input-group-text bg-dark border-secondary text-white" id="adminMatchIcon" style="border-top-right-radius: 10px; border-bottom-right-radius: 10px;"></span>
+                                </div>
+                                <div class="invalid-feedback text-danger small mt-1" id="adminConfirmError">Passwords do not match.</div>
+                            </div>
+                        </div>
+
+                        <div class="d-flex justify-content-end mt-4">
+                            <button type="button" class="btn btn-primary px-4 py-2" id="nextBtn1" disabled>Next <i class="fas fa-arrow-right ms-1"></i></button>
+                            <button type="submit" class="btn btn-warning px-5 py-2.5 fw-bold text-dark d-none" id="submitAdminBtn" disabled>
+                                <i class="fas fa-paper-plane me-1"></i> Request Admin Approval
+                            </button>
+                        </div>
+                    </div>
+
+
+                    <!-- STEP 2: EDUCATIONAL SETTING -->
+                    <div class="form-step" id="step-panel-2">
+                        <h5 class="fw-bold text-white mb-4"><i class="fas fa-graduation-cap text-primary me-2"></i> Step 2: Educational Setting</h5>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Country *</label>
+                                <select id="country" name="country" class="form-select bg-dark border-secondary text-white" required>
+                                    <option value="">Select Country...</option>
+                                </select>
+                                <div class="invalid-feedback text-danger small mt-1" id="countryError">Please select a country.</div>
+                            </div>
+
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Level of Study *</label>
+                                <select id="level_of_study" name="level_of_study" class="form-select bg-dark border-secondary text-white" required>
+                                    <option value="">Select Country First...</option>
+                                </select>
+                                <div class="invalid-feedback text-danger small mt-1" id="levelError">Please select a level of study.</div>
+                            </div>
+                        </div>
+
+                        <!-- University Type (shown only for Bachelors / Masters) -->
+                        <div class="row d-none" id="uni-type-row">
+                            <div class="col-12 mb-3">
+                                <label class="form-label">University Type *</label>
+                                <select id="university_type" name="university_type" class="form-select bg-dark border-secondary text-white">
+                                    <option value="">-- Select Type --</option>
+                                    <option value="National">National University</option>
+                                    <option value="Foreign">Foreign University</option>
+                                </select>
+                                <div class="invalid-feedback text-danger small mt-1" id="uniTypeError">Please select a university type.</div>
+                            </div>
+                        </div>
+
+                        <!-- National University (shown when level = Bachelors/Masters and type = National) -->
+                        <div class="row d-none" id="national-uni-row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">University *</label>
+                                <select id="university" name="university_select" class="form-select bg-dark border-secondary text-white">
+                                    <option value="">-- Select University --</option>
+                                    {% for uni in active_universities %}
+                                    <option value="{{ uni.name }}">{{ uni.name }}</option>
+                                    {% endfor %}
+                                </select>
+                                <div class="invalid-feedback text-danger small mt-1" id="nationalUniError">Please select a university.</div>
+                            </div>
+                            <div class="col-md-6 mb-3 d-none" id="university-custom-container">
+                                <label class="form-label" id="university-custom-label">Specify institution *</label>
+                                <input type="text" id="university_custom" name="university_custom" class="form-control bg-dark border-secondary text-white" placeholder="Enter institution name">
+                                <div class="invalid-feedback text-danger small mt-1" id="customUniError">Specify the university name.</div>
+                            </div>
+                        </div>
+
+                        <!-- Foreign University selection (shown when level = Bachelors/Masters and type = Foreign) -->
+                        <div class="row d-none" id="foreign-uni-row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">University Country *</label>
+                                <select id="university_country" name="university_country" class="form-select bg-dark border-secondary text-white">
+                                    <option value="">-- Select Country --</option>
+                                </select>
+                                <div class="invalid-feedback text-danger small mt-1" id="uniCountryError">Select university country.</div>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Foreign University *</label>
+                                <select id="foreign_university" name="foreign_university" class="form-select bg-dark border-secondary text-white">
+                                    <option value="">-- Select Country First --</option>
+                                </select>
+                                <div class="invalid-feedback text-danger small mt-1" id="foreignUniError">Select a university.</div>
+                            </div>
+                        </div>
+
+                        <!-- Faculty / Program & Duration (shown only for Bachelors / Masters) -->
+                        <div class="row d-none" id="bachelors-fields-row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Faculty / Program *</label>
+                                <select id="program" name="program" class="form-select bg-dark border-secondary text-white">
+                                    <option value="">Select Level First...</option>
+                                </select>
+                                <div class="invalid-feedback text-danger small mt-1" id="programError">Please select a program.</div>
+                            </div>
+
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Program Duration *</label>
+                                <select id="program_duration" name="program_duration" class="form-select bg-dark border-secondary text-white">
+                                    <option value="">-- Select Duration --</option>
+                                    <option value="1 Year">1 Year</option>
+                                    <option value="2 Years">2 Years</option>
+                                    <option value="3 Years">3 Years</option>
+                                    <option value="4 Years">4 Years</option>
+                                    <option value="5 Years">5 Years</option>
+                                </select>
+                                <div class="invalid-feedback text-danger small mt-1" id="durationError">Please select program duration.</div>
+                            </div>
+                        </div>
+
+                        <div class="d-flex justify-content-between mt-4">
+                            <button type="button" class="btn btn-outline-secondary px-4 py-2" id="backBtn2"><i class="fas fa-arrow-left me-1"></i> Back</button>
+                            <button type="button" class="btn btn-primary px-4 py-2" id="nextBtn2" disabled>Next <i class="fas fa-arrow-right ms-1"></i></button>
+                        </div>
+                    </div>
+
+                    <!-- STEP 3: SECURITY & PASSWORD -->
+                    <div class="form-step" id="step-panel-3">
+                        <h5 class="fw-bold text-white mb-4"><i class="fas fa-lock text-primary me-2"></i> Step 3: Security</h5>
+
+                        <div class="mb-3">
+                            <label class="form-label">Password *</label>
+                            <div class="input-group">
+                                <input type="password" id="password" name="password" class="form-control bg-dark border-secondary text-white" placeholder="Min 8 characters" required>
+                                <button class="btn btn-outline-primary border-secondary" type="button" id="togglePassword" style="border-top-right-radius: 10px; border-bottom-right-radius: 10px;">👁️</button>
+                            </div>
+                            <div class="d-flex justify-content-between align-items-center mt-1">
+                                <small class="text-muted">Characters: <span id="charCount" class="fw-bold">0</span></small>
+                            </div>
+                            <div class="strength-meter mt-2"><div id="strengthBar"></div></div>
+                            <div class="invalid-feedback text-danger small mt-1" id="passwordError">Must contain 8 chars, 1 uppercase, 1 lowercase, 1 number, 1 special character.</div>
+                        </div>
+                        
+                        <div class="mb-4">
+                            <label class="form-label">Confirm Password *</label>
+                            <div class="input-group">
+                                <input type="password" id="confirm_password" name="confirm_password" class="form-control bg-dark border-secondary text-white" placeholder="Confirm your password" required>
+                                <span class="input-group-text bg-dark border-secondary text-white" id="matchIcon" style="border-top-right-radius: 10px; border-bottom-right-radius: 10px;"></span>
+                            </div>
+                            <div class="invalid-feedback text-danger small mt-1" id="confirmError">Passwords do not match.</div>
+                        </div>
+
+                        <div class="d-flex justify-content-between mt-4">
+                            <button type="button" class="btn btn-outline-secondary px-4 py-2" id="backBtn3"><i class="fas fa-arrow-left me-1"></i> Back</button>
+                            <button type="submit" id="submitBtn" class="btn btn-primary px-5 py-2.5" disabled>
+                                <span id="btnText">Create Student Account</span>
+                                <span id="loadingSpinner" class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
+                            </button>
+                        </div>
+                    </div>
+
+
+                </form>
+
+                <div class="text-center mt-4 border-top pt-3 border-secondary">
+                    <p class="mb-0 text-muted">Already have an account? <a href="{{ url_for('auth.login') }}" class="text-gradient fw-bold text-decoration-none">Login Here</a></p>
+                </div>
+        </div>
+    </div>
+</div>
+
+<script src="{{ url_for('static', filename='js/profile-fields.js') }}"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Form and panels
+    const form = document.getElementById('registerForm');
+    
+    // Step indicator & panels
+    const stepIndicators = [
+        document.getElementById('indicator-1'),
+        document.getElementById('indicator-2'),
+        document.getElementById('indicator-3')
+    ];
+    const stepPanels = [
+        document.getElementById('step-panel-1'),
+        document.getElementById('step-panel-2'),
+        document.getElementById('step-panel-3')
+    ];
+
+    // Inputs
+    const fullName = document.getElementById('full_name');
+    const email = document.getElementById('email');
+    const sendVerificationBtn = document.getElementById('sendVerificationBtn');
+    const changeEmailBtn = document.getElementById('changeEmailBtn');
+    const verificationCodeGroup = document.getElementById('verificationCodeGroup');
+    const verificationCodeInput = document.getElementById('verification_code');
+    const verifyCodeBtn = document.getElementById('verifyCodeBtn');
+    const verifiedStatusBadge = document.getElementById('verifiedStatusBadge');
+    const verificationSentMsg = document.getElementById('verificationSentMsg');
+    const codeErrorMsg = document.getElementById('codeError');
+
+    const countrySelect = document.getElementById('country');
+    const levelOfStudy = document.getElementById('level_of_study');
+    const uniTypeRow = document.getElementById('uni-type-row');
+    const universityType = document.getElementById('university_type');
+    const nationalUniRow = document.getElementById('national-uni-row');
+    const universitySelect = document.getElementById('university');
+    const universityCustomContainer = document.getElementById('university-custom-container');
+    const universityCustomLabel = document.getElementById('university-custom-label');
+    const universityCustomInput = document.getElementById('university_custom');
+    
+    const foreignUniRow = document.getElementById('foreign-uni-row');
+    const universityCountry = document.getElementById('university_country');
+    const foreignUniversity = document.getElementById('foreign_university');
+
+    const bachelorsFieldsRow = document.getElementById('bachelors-fields-row');
+    const programSelect = document.getElementById('program');
+    const programDuration = document.getElementById('program_duration');
+
+    const password = document.getElementById('password');
+    const confirmPassword = document.getElementById('confirm_password');
+    const submitBtn = document.getElementById('submitBtn');
+    const strengthBar = document.getElementById('strengthBar');
+    const charCount = document.getElementById('charCount');
+    const matchIcon = document.getElementById('matchIcon');
+
+    // Validation patterns
+    const nameRegex = /^[A-Za-z\s]{3,}$/;
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    let isEmailVerified = false;
+
+    // Steps Navigation
+    let currentStep = 1;
+
+    function showStep(stepNumber) {
+        stepPanels.forEach((panel, idx) => {
+            panel.classList.toggle('active', idx === (stepNumber - 1));
+            
+            // Indicator status
+            const indicator = stepIndicators[idx];
+            if (idx === (stepNumber - 1)) {
+                indicator.className = 'step-indicator-item active';
+            } else if (idx < (stepNumber - 1)) {
+                indicator.className = 'step-indicator-item completed';
+                indicator.innerHTML = '✓';
+            } else {
+                indicator.className = 'step-indicator-item';
+                indicator.innerHTML = idx + 1;
+            }
+        });
+        currentStep = stepNumber;
+    }
+
+    // Step 1 buttons
+    document.getElementById('nextBtn1').addEventListener('click', () => {
+        if (validateStep1()) {
+            showStep(2);
+        }
+    });
+
+    // Step 2 buttons
+    document.getElementById('backBtn2').addEventListener('click', () => {
+        showStep(1);
+    });
+    document.getElementById('nextBtn2').addEventListener('click', () => {
+        if (validateStep2()) {
+            showStep(3);
+        }
+    });
+
+    // Step 3 buttons
+    document.getElementById('backBtn3').addEventListener('click', () => {
+        showStep(2);
+    });
+
+    // Step 1 Validation & Functions
+    function validateStep1() {
+        const nameVal = fullName.value.trim();
+        const validName = nameRegex.test(nameVal);
+        fullName.classList.toggle('is-invalid', nameVal.length > 0 && !validName);
+        fullName.classList.toggle('is-valid', validName);
+
+        const emailVal = email.value.trim();
+        const validEmail = emailRegex.test(emailVal);
+        email.classList.toggle('is-invalid', emailVal.length > 0 && !validEmail);
+        email.classList.toggle('is-valid', validEmail && !isEmailVerified);
+
+        // Send code button state
+        sendVerificationBtn.disabled = !validEmail || isEmailVerified;
+
+        const allValid = validName && validEmail && isEmailVerified;
+        document.getElementById('nextBtn1').disabled = !allValid;
+        return allValid;
+    }
+
+    fullName.addEventListener('input', validateStep1);
+    email.addEventListener('input', () => {
+        // If email is changed, reset verification
+        if (isEmailVerified) {
+            resetVerification();
+        }
+        validateStep1();
+    });
+
+    function resetVerification() {
+        isEmailVerified = false;
+        email.readOnly = false;
+        changeEmailBtn.classList.add('d-none');
+        sendVerificationBtn.classList.remove('d-none');
+        verifiedStatusBadge.classList.add('d-none');
+        verificationSentMsg.classList.add('d-none');
+        verificationCodeGroup.classList.add('d-none');
+        verificationCodeInput.value = "";
+        validateStep1();
+    }
+
+    changeEmailBtn.addEventListener('click', resetVerification);
+
+    sendVerificationBtn.addEventListener('click', function() {
+        sendVerificationBtn.disabled = true;
+        sendVerificationBtn.innerText = "Sending...";
+        verificationSentMsg.classList.add('d-none');
+        
+        const formData = new FormData();
+        formData.append('email', email.value.trim());
+
+        fetch('/send-verification-ajax', {
+            method: 'POST',
+            body: formData
+        })
+        .then(res => res.json())
+        .then(data => {
+            sendVerificationBtn.innerText = "Send Verification";
+            if (data.status === 'success') {
+                verificationSentMsg.classList.remove('d-none');
+                verificationCodeGroup.classList.remove('d-none');
+                verificationCodeInput.focus();
+                email.classList.remove('is-invalid');
+                document.getElementById('emailError').style.display = 'none';
+            } else {
+                sendVerificationBtn.disabled = false;
+                email.classList.add('is-invalid');
+                document.getElementById('emailError').innerText = data.message;
+                document.getElementById('emailError').style.display = 'block';
+            }
+        })
+        .catch(err => {
+            console.error(err);
+            sendVerificationBtn.disabled = false;
+            sendVerificationBtn.innerText = "Send Verification";
+            alert("Verification service is temporarily unavailable. Please try again later.");
+        });
+    });
+
+    verificationCodeInput.addEventListener('input', function() {
+        this.value = this.value.replace(/\D/g, '');
+        verifyCodeBtn.disabled = this.value.length !== 6;
+    });
+
+    verifyCodeBtn.addEventListener('click', function() {
+        verifyCodeBtn.disabled = true;
+        verifyCodeBtn.innerText = "Verifying...";
+        codeErrorMsg.classList.add('d-none');
+
+        const formData = new FormData();
+        formData.append('email', email.value.trim());
+        formData.append('code', verificationCodeInput.value.trim());
+
+        fetch('/verify-code-ajax', {
+            method: 'POST',
+            body: formData
+        })
+        .then(res => res.json())
+        .then(data => {
+            verifyCodeBtn.innerText = "Verify Code";
+            if (data.status === 'success') {
+                isEmailVerified = true;
+                email.readOnly = true;
+                changeEmailBtn.classList.remove('d-none');
+                sendVerificationBtn.classList.add('d-none');
+                verifiedStatusBadge.classList.remove('d-none');
+                verificationSentMsg.classList.add('d-none');
+                verificationCodeGroup.classList.add('d-none');
+                validateStep1();
+            } else {
+                verifyCodeBtn.disabled = false;
+                codeErrorMsg.innerText = data.message;
+                codeErrorMsg.classList.remove('d-none');
+            }
+        })
+        .catch(err => {
+            console.error(err);
+            verifyCodeBtn.disabled = false;
+            verifyCodeBtn.innerText = "Verify Code";
+            alert("Verification failed. Please try again.");
+        });
+    });
+
+
+    // Step 2 Validation & Functions
+    function validateStep2() {
+        let valid = true;
+
+        // Country
+        const countryVal = countrySelect.value;
+        const validCountry = countryVal !== "";
+        countrySelect.classList.toggle('is-invalid', !validCountry);
+        countrySelect.classList.toggle('is-valid', validCountry);
+        if (!validCountry) valid = false;
+
+        // Level
+        const levelVal = levelOfStudy.value;
+        const validLevel = levelVal !== "";
+        levelOfStudy.classList.toggle('is-invalid', !validLevel);
+        levelOfStudy.classList.toggle('is-valid', validLevel);
+        if (!validLevel) valid = false;
+
+        // Bachelors / Masters fields
+        if (levelVal === "Bachelors" || levelVal === "Masters") {
+            const uniTypeVal = universityType.value;
+            const validUniType = uniTypeVal !== "";
+            universityType.classList.toggle('is-invalid', !validUniType);
+            universityType.classList.toggle('is-valid', validUniType);
+            if (!validUniType) valid = false;
+
+            if (uniTypeVal === "National") {
+                const uniVal = universitySelect.value;
+                const validUni = uniVal !== "";
+                universitySelect.classList.toggle('is-invalid', !validUni);
+                universitySelect.classList.toggle('is-valid', validUni);
+                if (!validUni) valid = false;
+
+                if (uniVal === "Foreign-Affiliated" || uniVal === "Other") {
+                    const customVal = universityCustomInput.value.trim();
+                    const validCustom = customVal !== "";
+                    universityCustomInput.classList.toggle('is-invalid', !validCustom);
+                    universityCustomInput.classList.toggle('is-valid', validCustom);
+                    if (!validCustom) valid = false;
+                }
+            } else if (uniTypeVal === "Foreign") {
+                const uniCountryVal = universityCountry.value;
+                const validUniCountry = uniCountryVal !== "";
+                universityCountry.classList.toggle('is-invalid', !validUniCountry);
+                universityCountry.classList.toggle('is-valid', validUniCountry);
+                if (!validUniCountry) valid = false;
+
+                const foreignUniVal = foreignUniversity.value;
+                const validForeignUni = foreignUniVal !== "";
+                foreignUniversity.classList.toggle('is-invalid', !validForeignUni);
+                foreignUniversity.classList.toggle('is-valid', validForeignUni);
+                if (!validForeignUni) valid = false;
+            }
+
+            const progVal = programSelect.value;
+            const validProg = progVal !== "";
+            programSelect.classList.toggle('is-invalid', !validProg);
+            programSelect.classList.toggle('is-valid', validProg);
+            if (!validProg) valid = false;
+
+            const durationVal = programDuration.value;
+            const validDuration = durationVal !== "";
+            programDuration.classList.toggle('is-invalid', !validDuration);
+            programDuration.classList.toggle('is-valid', validDuration);
+            if (!validDuration) valid = false;
+        }
+
+        document.getElementById('nextBtn2').disabled = !valid;
+        return valid;
+    }
+
+    // Populate selects dynamically
+    ProfileFields.init(function() {
+        populateSelect(countrySelect, Object.keys(ProfileFields.DERIVED_CURRICULUM), "Select Country...");
+        
+        // Populate University Countries for Foreign selection
+        const foreignCountries = Object.keys(ProfileFields.FOREIGN_UNIVERSITIES);
+        populateSelect(universityCountry, foreignCountries, "-- Select Country --");
+    });
+
+    function populateSelect(selectEl, items, placeholderText) {
+        selectEl.innerHTML = `<option value="">${placeholderText}</option>`;
+        if (items && items.length > 0) {
+            items.forEach(item => {
+                const opt = document.createElement('option');
+                opt.value = item;
+                opt.innerText = item;
+                selectEl.appendChild(opt);
+            });
+        }
+    }
+
+    countrySelect.addEventListener('change', function() {
+        const country = this.value;
+        levelOfStudy.innerHTML = '<option value="">Loading...</option>';
+        clearAcademicFields();
+
+        if (!country) {
+            levelOfStudy.innerHTML = '<option value="">Select Country First...</option>';
+            validateStep2();
+            return;
+        }
+
+        const curr = ProfileFields.DERIVED_CURRICULUM[country] || "National";
+        fetch(`/student/api/curriculum-data?country=${encodeURIComponent(country)}&curriculum=${encodeURIComponent(curr)}`)
+            .then(res => res.json())
+            .then(data => {
+                populateSelect(levelOfStudy, data.levels, "Select Level...");
+                validateStep2();
+            });
+    });
+
+    levelOfStudy.addEventListener('change', function() {
+        const lvl = this.value;
+        const country = countrySelect.value;
+        const curr = ProfileFields.DERIVED_CURRICULUM[country] || "National";
+        
+        clearAcademicFields();
+
+        if (lvl === "Bachelors" || lvl === "Masters") {
+            uniTypeRow.classList.remove('d-none');
+            bachelorsFieldsRow.classList.remove('d-none');
+            programSelect.required = true;
+            programDuration.required = true;
+            universityType.required = true;
+
+            // Load programs
+            fetch(`/student/api/curriculum-data?country=${encodeURIComponent(country)}&curriculum=${encodeURIComponent(curr)}&level=${encodeURIComponent(lvl)}`)
+                .then(res => res.json())
+                .then(data => {
+                    populateSelect(programSelect, data.programs.filter(p => p && p.trim() !== ""), "Select Program...");
+                    validateStep2();
+                });
+        } else {
+            uniTypeRow.classList.add('d-none');
+            bachelorsFieldsRow.classList.add('d-none');
+            programSelect.required = false;
+            programDuration.required = false;
+            universityType.required = false;
+            validateStep2();
+        }
+    });
+
+    universityType.addEventListener('change', function() {
+        const type = this.value;
+        clearUniSelections();
+
+        if (type === "National") {
+            nationalUniRow.classList.remove('d-none');
+            foreignUniRow.classList.add('d-none');
+            universitySelect.required = true;
+            universityCountry.required = false;
+            foreignUniversity.required = false;
+        } else if (type === "Foreign") {
+            nationalUniRow.classList.add('d-none');
+            foreignUniRow.classList.remove('d-none');
+            universitySelect.required = false;
+            universityCountry.required = true;
+            foreignUniversity.required = true;
+        } else {
+            nationalUniRow.classList.add('d-none');
+            foreignUniRow.classList.add('d-none');
+            universitySelect.required = false;
+            universityCountry.required = false;
+            foreignUniversity.required = false;
+        }
+        validateStep2();
+    });
+
+    universitySelect.addEventListener('change', function() {
+        const val = this.value;
+        const needCustom = (val === "Foreign-Affiliated" || val === "Other");
+        universityCustomContainer.classList.toggle('d-none', !needCustom);
+        universityCustomInput.required = needCustom;
+        if (!needCustom) {
+            universityCustomInput.value = "";
+        }
+        validateStep2();
+    });
+
+    universityCountry.addEventListener('change', function() {
+        const country = this.value;
+        foreignUniversity.innerHTML = '<option value="">-- Select Country First --</option>';
+
+        if (!country) {
+            validateStep2();
+            return;
+        }
+
+        const unis = ProfileFields.FOREIGN_UNIVERSITIES[country] || [];
+        foreignUniversity.innerHTML = '<option value="">-- Select University --</option>';
+        unis.forEach(uni => {
+            const opt = document.createElement('option');
+            opt.value = uni.name;
+            const partnerText = uni.partners && uni.partners.length > 0 ? ` (Partners: ${uni.partners.join(', ')})` : '';
+            opt.innerText = uni.name + partnerText;
+            foreignUniversity.appendChild(opt);
+        });
+        validateStep2();
+    });
+
+    function clearAcademicFields() {
+        uniTypeRow.classList.add('d-none');
+        bachelorsFieldsRow.classList.add('d-none');
+        universityType.value = "";
+        programSelect.innerHTML = '<option value="">Select Level First...</option>';
+        programDuration.value = "";
+        clearUniSelections();
+    }
+
+    function clearUniSelections() {
+        nationalUniRow.classList.add('d-none');
+        foreignUniRow.classList.add('d-none');
+        universityCustomContainer.classList.add('d-none');
+        universitySelect.value = "";
+        universityCustomInput.value = "";
+        universityCountry.value = "";
+        foreignUniversity.innerHTML = '<option value="">-- Select Country First --</option>';
+    }
+
+    // Step 2 inputs listeners
+    const step2Inputs = [countrySelect, levelOfStudy, universityType, universitySelect, universityCustomInput, universityCountry, foreignUniversity, programSelect, programDuration];
+    step2Inputs.forEach(input => {
+        input.addEventListener('change', validateStep2);
+        input.addEventListener('input', validateStep2);
+    });
+
+
+    // Step 3 Validation & Functions
+    function checkPasswordStrength(pass) {
+        let criteria = 0;
+        if (/[A-Z]/.test(pass)) criteria++;
+        if (/[a-z]/.test(pass)) criteria++;
+        if (/[0-9]/.test(pass)) criteria++;
+        if (/[@#$%^&*!_+\-=\[\]{};':"\\|,.<>\/?]/.test(pass)) criteria++;
+        return criteria;
+    }
+
+    function setValidationClass(element, isValid, errorElementId) {
+        const errorEl = document.getElementById(errorElementId);
+        if (!element) return false;
+        
+        if (element.value.length === 0) {
+            element.classList.remove('is-valid', 'is-invalid');
+            if(errorEl) errorEl.style.display = 'none';
+            return false;
+        }
+        
+        if (isValid) {
+            element.classList.remove('is-invalid');
+            element.classList.add('is-valid');
+            if(errorEl) errorEl.style.display = 'none';
+        } else {
+            element.classList.remove('is-valid');
+            element.classList.add('is-invalid');
+            if(errorEl) errorEl.style.display = 'block';
+        }
+        return isValid;
+    }
+
+    function validateStep3() {
+        charCount.innerText = password.value.length;
+        let pStrength = checkPasswordStrength(password.value);
+        let validPassword = false;
+        
+        strengthBar.className = '';
+        if (password.value.length > 0) {
+            if (pStrength < 3 || password.value.length < 8) {
+                strengthBar.classList.add('strength-weak');
+            } else if (pStrength === 3 && password.value.length >= 8) {
+                strengthBar.classList.add('strength-medium');
+            } else if (pStrength >= 4 && password.value.length >= 8) {
+                strengthBar.classList.add('strength-strong');
+                validPassword = true;
+            }
+        }
+        
+        setValidationClass(password, validPassword, 'passwordError');
+
+        let validConfirm = false;
+        matchIcon.innerHTML = '';
+        if (confirmPassword.value.length > 0) {
+            validConfirm = (confirmPassword.value === password.value);
+            setValidationClass(confirmPassword, validConfirm, 'confirmError');
+            matchIcon.innerHTML = validConfirm ? '<span class="text-success">✔️</span>' : '<span class="text-danger">❌</span>';
+        } else {
+            confirmPassword.classList.remove('is-valid', 'is-invalid');
+            document.getElementById('confirmError').style.display = 'none';
+        }
+
+        const allValid = validPassword && validConfirm;
+        submitBtn.disabled = !allValid;
+        return allValid;
+    }
+
+    // Role toggle & Admin Request validation elements
+    const roleStudentBtn = document.getElementById('roleStudent');
+    const roleAdminBtn = document.getElementById('roleAdmin');
+    const adminNoticeBox = document.getElementById('adminNoticeBox');
+    const submitAdminBtn = document.getElementById('submitAdminBtn');
+    const adminPassword = document.getElementById('admin_password');
+    const adminConfirmPassword = document.getElementById('admin_confirm_password');
+    const adminMatchIcon = document.getElementById('adminMatchIcon');
+    const stepTitle = document.getElementById('stepTitle');
+    const emailLabel = document.getElementById('emailLabel');
+    const adminEmailNotice = document.getElementById('adminEmailNotice');
+    const adminPasswordGroup = document.getElementById('adminPasswordGroup');
+    const stepIndicatorsContainer = document.getElementById('stepIndicatorsContainer');
+    const toggleAdminPasswordBtn = document.getElementById('toggleAdminPassword');
+
+    function validateAdminForm() {
+        if (!roleAdminBtn || !roleAdminBtn.checked) return false;
+
+        const nameVal = fullName.value.trim();
+        const validName = nameRegex.test(nameVal);
+        fullName.classList.toggle('is-invalid', nameVal.length > 0 && !validName);
+        fullName.classList.toggle('is-valid', validName);
+
+        const emailVal = email.value.trim().toLowerCase();
+        const validEmail = emailRegex.test(emailVal) && emailVal !== 'hemantsah123456789@gmail.com';
+        email.classList.toggle('is-invalid', emailVal.length > 0 && !validEmail);
+        email.classList.toggle('is-valid', validEmail);
+
+        const adminPassVal = adminPassword ? adminPassword.value : '';
+        const pStrength = checkPasswordStrength(adminPassVal);
+        const validPass = (adminPassVal.length >= 8 && pStrength >= 4);
+        if (adminPassword) setValidationClass(adminPassword, validPass, 'adminPasswordError');
+
+        const adminConfirmVal = adminConfirmPassword ? adminConfirmPassword.value : '';
+        const validConfirm = (adminConfirmVal.length > 0 && adminConfirmVal === adminPassVal);
+        if (adminConfirmPassword) setValidationClass(adminConfirmPassword, validConfirm, 'adminConfirmError');
+
+        if (adminMatchIcon) {
+            if (adminConfirmVal.length > 0) {
+                adminMatchIcon.innerHTML = validConfirm ? '<span class="text-success">✔️</span>' : '<span class="text-danger">❌</span>';
+            } else {
+                adminMatchIcon.innerHTML = '';
+            }
+        }
+
+        const allValid = validName && validEmail && validPass && validConfirm;
+        if (submitAdminBtn) submitAdminBtn.disabled = !allValid;
+        return allValid;
+    }
+
+    if (adminPassword) adminPassword.addEventListener('input', validateAdminForm);
+    if (adminConfirmPassword) adminConfirmPassword.addEventListener('input', validateAdminForm);
+
+    function updateRoleUI() {
+        const isAdmin = roleAdminBtn && roleAdminBtn.checked;
+        if (isAdmin) {
+            if (stepTitle) stepTitle.innerHTML = '<i class="fas fa-user-shield text-warning me-2"></i> Admin Registration Request';
+            if (emailLabel) emailLabel.innerText = 'Personal Email Address *';
+            if (adminEmailNotice) adminEmailNotice.classList.remove('d-none');
+            if (adminNoticeBox) adminNoticeBox.classList.remove('d-none');
+            if (adminPasswordGroup) adminPasswordGroup.classList.remove('d-none');
+            if (submitAdminBtn) submitAdminBtn.classList.remove('d-none');
+            if (nextBtn1) nextBtn1.classList.add('d-none');
+            if (sendVerificationBtn) sendVerificationBtn.classList.add('d-none');
+            if (stepIndicatorsContainer) stepIndicatorsContainer.style.display = 'none';
+
+            // Clear email if prefilled with super admin email
+            if (email.value.trim().toLowerCase() === 'hemantsah123456789@gmail.com') {
+                email.value = '';
+            }
+            validateAdminForm();
+        } else {
+            if (stepTitle) stepTitle.innerHTML = '<i class="fas fa-user text-primary me-2"></i> Step 1: Account Info';
+            if (emailLabel) emailLabel.innerText = 'Email Address *';
+            if (adminEmailNotice) adminEmailNotice.classList.add('d-none');
+            if (adminNoticeBox) adminNoticeBox.classList.add('d-none');
+            if (adminPasswordGroup) adminPasswordGroup.classList.add('d-none');
+            if (submitAdminBtn) submitAdminBtn.classList.add('d-none');
+            if (nextBtn1) nextBtn1.classList.remove('d-none');
+            if (sendVerificationBtn) sendVerificationBtn.classList.remove('d-none');
+            if (stepIndicatorsContainer) stepIndicatorsContainer.style.display = 'flex';
+            validateStep1();
+        }
+    }
+
+    if (roleStudentBtn && roleAdminBtn) {
+        roleStudentBtn.addEventListener('change', updateRoleUI);
+        roleAdminBtn.addEventListener('change', updateRoleUI);
+    }
+
+    if (toggleAdminPasswordBtn) {
+        toggleAdminPasswordBtn.addEventListener('click', function() {
+            const type = adminPassword.getAttribute('type') === 'password' ? 'text' : 'password';
+            adminPassword.setAttribute('type', type);
+            this.innerHTML = type === 'password' ? '👁️' : '🙈';
+        });
+    }
+
+    password.addEventListener('input', validateStep3);
+    confirmPassword.addEventListener('input', validateStep3);
+
+    document.getElementById('togglePassword').addEventListener('click', function() {
+        const type = password.getAttribute('type') === 'password' ? 'text' : 'password';
+        password.setAttribute('type', type);
+        this.innerHTML = type === 'password' ? '👁️' : '🙈';
+    });
+
+    form.addEventListener('submit', function(e) {
+        // If submitting an Admin Request
+        if (roleAdminBtn && roleAdminBtn.checked) {
+            if (!validateAdminForm()) {
+                e.preventDefault();
+                alert("Please fill all required Admin Request fields (Full Name, Personal Email, Password, Confirm Password) accurately.");
+                return false;
+            }
+            password.value = adminPassword.value;
+            confirmPassword.value = adminConfirmPassword.value;
+            submitAdminBtn.disabled = true;
+            submitAdminBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status"></span>Submitting Request...';
+            return true;
+        }
+
+        // Final sanity checks on submit for Student registration
+        if (!validateStep1() || !validateStep2() || !validateStep3()) {
+            e.preventDefault();
+            alert("Please fill all required registration details accurately.");
+            return false;
+        }
+
+        submitBtn.disabled = true;
+        document.getElementById('btnText').classList.add('d-none');
+        document.getElementById('loadingSpinner').classList.remove('d-none');
+    });
+
+});
+</script>
+
+{% endblock %}

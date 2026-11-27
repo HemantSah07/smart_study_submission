@@ -1,0 +1,150 @@
+{% extends 'admin/admin_base.html' %}
+{% block title %}Admin Profile &amp; Account Security — Admin Control Center{% endblock %}
+
+{% block breadcrumb_items %}
+    <span class="active-item">Admin Profile &amp; Security</span>
+{% endblock %}
+
+{% block admin_content %}
+<!-- Header Bar -->
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+    <div>
+        <h1 class="h3 fw-bold text-white mb-1"><i class="fas fa-user-shield me-2 text-primary"></i> Admin Profile &amp; Account Security</h1>
+        <p class="text-muted small mb-0">System administrator credentials, password management, session security, and account activity log.</p>
+    </div>
+</div>
+
+<div class="row g-4 mb-4">
+    <!-- Account Overview Card -->
+    <div class="col-lg-5">
+        <div class="admin-card h-100 mb-0">
+            <div class="admin-card-header">
+                <h2 class="admin-card-title"><i class="fas fa-id-card text-primary"></i> Account Credentials</h2>
+                <span class="badge-status active"><i class="fas fa-check"></i> ACTIVE ADMIN</span>
+            </div>
+
+            <div class="d-flex align-items-center gap-3 p-3 mb-4 rounded" style="background: rgba(255,255,255,0.02); border: 1px solid var(--admin-border);">
+                <div class="avatar-lg rounded-circle bg-primary-subtle text-primary fw-bold d-flex align-items-center justify-content-center fs-3" style="width: 56px; height: 56px;">
+                    {{ (current_user.full_name or current_user.email or 'A')[0].upper() }}
+                </div>
+                <div class="min-w-0 flex-grow-1">
+                    <div class="fw-bold text-white fs-6 text-truncate">{{ current_user.full_name or 'System Administrator' }}</div>
+                    <div class="text-muted font-mono small text-truncate">{{ current_user.email }}</div>
+                    <div class="badge bg-primary-subtle text-primary border border-primary-subtle px-2 py-0.5 mt-1 font-mono">User ID: {{ current_user.id }}</div>
+                </div>
+            </div>
+
+            <div class="d-flex flex-column gap-2.5">
+                <div class="p-2.5 rounded d-flex align-items-center justify-content-between" style="background: rgba(255,255,255,0.02); border: 1px solid var(--admin-border); font-size: 0.85rem;">
+                    <span class="text-muted fw-semibold">Administrative Role</span>
+                    <span class="badge bg-primary-subtle text-primary border border-primary-subtle font-mono fw-bold">SYSTEM ADMIN</span>
+                </div>
+                <div class="p-2.5 rounded d-flex align-items-center justify-content-between" style="background: rgba(255,255,255,0.02); border: 1px solid var(--admin-border); font-size: 0.85rem;">
+                    <span class="text-muted fw-semibold">Account Status</span>
+                    <span class="badge-status active"><i class="fas fa-circle-check"></i> Operational</span>
+                </div>
+                <div class="p-2.5 rounded d-flex align-items-center justify-content-between" style="background: rgba(255,255,255,0.02); border: 1px solid var(--admin-border); font-size: 0.85rem;">
+                    <span class="text-muted fw-semibold">Registration Timestamp</span>
+                    <span class="small text-white font-mono">{{ current_user.date_registered.strftime('%Y-%m-%d %H:%M:%S') if current_user.date_registered else 'N/A' }}</span>
+                </div>
+                <div class="p-2.5 rounded d-flex align-items-center justify-content-between" style="background: rgba(255,255,255,0.02); border: 1px solid var(--admin-border); font-size: 0.85rem;">
+                    <span class="text-muted fw-semibold">Password Storage</span>
+                    <span class="badge bg-success-subtle text-success border border-success-subtle font-mono">Bcrypt Hash Encrypted</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Secure Change Password Form Card -->
+    <div class="col-lg-7">
+        <div class="admin-card h-100 mb-0">
+            <div class="admin-card-header">
+                <h2 class="admin-card-title"><i class="fas fa-key text-warning"></i> Change Admin Password</h2>
+            </div>
+
+            <form action="{{ url_for('admin.profile') }}" method="POST">
+                <input type="hidden" name="action_type" value="change_password">
+
+                <div class="mb-3">
+                    <label class="form-label text-muted small fw-semibold">Current Password</label>
+                    <input type="password" name="current_password" class="form-control admin-input font-mono" required placeholder="Enter current admin password">
+                    <div class="form-text text-dim">Verification requires exact match against active account hash.</div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label text-muted small fw-semibold">New Password</label>
+                    <input type="password" name="new_password" class="form-control admin-input font-mono" required placeholder="Enter new strong password">
+                </div>
+
+                <div class="mb-4">
+                    <label class="form-label text-muted small fw-semibold">Confirm New Password</label>
+                    <input type="password" name="confirm_password" class="form-control admin-input font-mono" required placeholder="Re-enter new password">
+                </div>
+
+                <div class="p-3 rounded mb-4" style="background: rgba(245, 158, 11, 0.08); border: 1px solid var(--admin-warning);">
+                    <div class="fw-bold text-white small mb-1"><i class="fas fa-shield-halved text-warning me-1"></i> Security Criteria Requirements</div>
+                    <ul class="text-dim small ps-3 mb-0" style="line-height: 1.5;">
+                        <li>Minimum 8 characters in length</li>
+                        <li>Includes uppercase letter (A-Z) and lowercase letter (a-z)</li>
+                        <li>Includes numeric digit (0-9)</li>
+                    </ul>
+                </div>
+
+                <div class="text-end">
+                    <button type="submit" class="btn btn-admin btn-admin-primary btn-admin-sm">
+                        <i class="fas fa-save me-1"></i> Update Admin Password
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Security Telemetry & Audit History Grid -->
+<div class="row g-4 mb-4">
+    <!-- Security & Telemetry Information Card -->
+    <div class="col-lg-6">
+        <div class="admin-card h-100 mb-0">
+            <div class="admin-card-header">
+                <h2 class="admin-card-title"><i class="fas fa-circle-info text-info"></i> Security Telemetry Information</h2>
+            </div>
+
+            <div class="p-3 rounded mb-3" style="background: rgba(59, 130, 246, 0.08); border: 1px solid var(--admin-info);">
+                <div class="fw-bold text-white small mb-1"><i class="fas fa-lock text-info me-1"></i> Protected Credentials Guard</div>
+                <div class="text-dim small">Password hashes, API keys, SMTP passwords, and secret tokens are never exposed in UI templates, exported files, or activity logs.</div>
+            </div>
+
+            <div class="p-3 rounded" style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--admin-border);">
+                <div class="fw-bold text-white small mb-1"><i class="fas fa-shield-cat text-warning me-1"></i> Non-Persisted Security Telemetry</div>
+                <div class="text-dim small">IP address logging, failed login attempt persistent history, and session token telemetry are not currently persisted by the authentication architecture.</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Admin Recent Activity Log -->
+    <div class="col-lg-6">
+        <div class="admin-card h-100 mb-0">
+            <div class="admin-card-header">
+                <h2 class="admin-card-title"><i class="fas fa-history text-primary"></i> Your Recent Admin Audit Logs</h2>
+                <a href="{{ url_for('admin.activity_log') }}" class="btn btn-admin btn-admin-secondary btn-admin-sm">View All</a>
+            </div>
+
+            {% if recent_logs %}
+            <div class="d-flex flex-column gap-2" style="max-height: 220px; overflow-y: auto;">
+                {% for log in recent_logs %}
+                <div class="p-2 rounded d-flex align-items-center justify-content-between" style="background: rgba(255,255,255,0.02); border: 1px solid var(--admin-border); font-size: 0.82rem;">
+                    <div class="min-w-0 me-2">
+                        <span class="badge bg-secondary-subtle text-white border border-secondary px-1.5 py-0.5 font-mono x-small">{{ log.action }}</span>
+                        <span class="text-white text-truncate ms-1" title="{{ log.detail }}">{{ log.detail or '—' }}</span>
+                    </div>
+                    <span class="text-muted font-mono x-small text-nowrap">{{ log.timestamp.strftime('%m-%d %H:%M') if log.timestamp else '' }}</span>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="p-4 text-center text-muted small">No recent activity logs recorded for this account.</div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

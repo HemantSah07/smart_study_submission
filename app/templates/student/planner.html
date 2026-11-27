@@ -1,0 +1,319 @@
+{% extends 'base.html' %}
+{% block title %}Study Planner · Focus Planning Studio{% endblock %}
+
+{% block content %}
+<div class="ss-page px-2 py-3">
+<!-- ── Focus Planning Studio Hero ── -->
+<section class="ss-page-hero position-relative overflow-hidden mb-4 no-print">
+    <div class="ss-page-hero-bg" style="background-image: url('{{ url_for('static', filename='img/ui/student/planner.webp') }}');"></div>
+    <div class="ss-page-hero-content py-3">
+        <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
+            <div>
+                <div class="ss-badge ss-badge-emerald mb-2">
+                    <i class="fas fa-magic me-1"></i> Focus Planning Studio
+                </div>
+                <h1 class="display-6 fw-bold text-white mb-1" style="letter-spacing: -0.02em;">
+                    Personalized Adaptive Study Plan
+                </h1>
+                <p class="text-muted mb-0" style="font-size: 1.05rem;">
+                    Adaptive weekly schedule generated from Machine Learning risk predictions and performance weighting.
+                </p>
+            </div>
+            <div class="d-flex gap-2">
+                <button onclick="window.print()" class="btn btn-primary px-4 py-2.5 shadow-sm">
+                    <i class="fas fa-download me-1.5"></i> Export PDF
+                </button>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ── Focus Planning Stepper Bar ── -->
+<div class="ss-planner-stepper no-print">
+    <div class="ss-stepper-step completed">
+        <div class="ss-stepper-num"><i class="fas fa-check"></i></div>
+        <span>01 Subjects</span>
+    </div>
+    <div class="ss-stepper-divider"></div>
+    <div class="ss-stepper-step completed">
+        <div class="ss-stepper-num"><i class="fas fa-check"></i></div>
+        <span>02 Availability</span>
+    </div>
+    <div class="ss-stepper-divider"></div>
+    <div class="ss-stepper-step completed">
+        <div class="ss-stepper-num"><i class="fas fa-check"></i></div>
+        <span>03 Priorities</span>
+    </div>
+    <div class="ss-stepper-divider"></div>
+    <div class="ss-stepper-step active">
+        <div class="ss-stepper-num">04</div>
+        <span>Generated Plan</span>
+    </div>
+</div>
+
+<div class="row g-4">
+
+    <!-- Planner Summary Banner -->
+    <div class="col-lg-4">
+        <div class="ss-panel p-4 mb-4">
+            <h5 class="fw-bold text-white mb-3"><i class="fas fa-chart-line text-emerald me-2"></i> Performance Summary</h5>
+            
+            <div class="text-center py-3">
+                <span class="ss-badge {% if planner.prediction_result == 'Pass' %}ss-badge-emerald{% elif planner.prediction_result == 'At Risk' %}ss-badge-amber{% else %}ss-badge-rose{% endif %} px-4 py-2 mb-3" style="font-size:0.9rem;">
+                    {{ planner.prediction_result|upper }} RISK
+                </span>
+                <p class="fw-bold text-muted small mb-1">Recommended Daily Study Intensity</p>
+                <div class="display-5 fw-bold text-gradient mb-2">{{ planner.recommended_daily_hours }}h <small class="fs-6 text-muted">/ day</small></div>
+            </div>
+            
+            <hr class="border-secondary my-3">
+            <p class="text-muted small text-center mb-0"><i class="fas fa-quote-left me-1 opacity-50 text-emerald"></i> {{ planner.planner_message }}</p>
+        </div>
+
+        <div class="ss-panel p-4 mb-4 no-print">
+            <h5 class="fw-bold text-white mb-3"><i class="fas fa-sliders-h text-primary me-2"></i> Studio Actions</h5>
+            <div class="d-flex flex-column gap-2">
+                <button onclick="window.print()" class="btn btn-primary w-100 py-2.5">
+                    <i class="fas fa-download me-2"></i> Download / Print Plan
+                </button>
+                <a href="{{ url_for('student.predict') }}" class="btn btn-outline-light w-100 py-2.5">
+                    <i class="fas fa-sync me-2"></i> Re-run ML Predictor
+                </a>
+            </div>
+        </div>
+        
+        <!-- Progress Bar Summary -->
+        <div class="ss-panel p-4 mb-4 no-print">
+            <h5 class="fw-bold text-white mb-2"><i class="fas fa-tasks text-cyan me-2"></i> Weekly Plan Progress</h5>
+            <div class="progress mb-3" style="height: 10px; background:rgba(255,255,255,0.08);">
+                <div class="progress-bar bg-primary" id="overall-progress-bar" style="width: 0%;"></div>
+            </div>
+            <p class="text-muted small mb-0" id="progress-text">0 / 0 sessions completed this week</p>
+        </div>
+    </div>
+
+
+    <!-- Subject Priorities & Weekly Schedule Accordion -->
+    <div class="col-lg-8">
+        {% if log_analysis and log_analysis.diverges_significantly %}
+        <div class="alert alert-warning border-warning border-1 rounded-3 p-4 mb-4 d-flex justify-content-between align-items-center flex-wrap gap-3 no-print">
+            <div>
+                <h6 class="fw-bold mb-1 text-warning"><i class="fas fa-exclamation-triangle me-2"></i> Adaptive Plan Alert</h6>
+                <p class="small mb-0 text-muted">Your logged study hours ({{ "%.1f"|format(log_analysis.total_logged_hours) }}h) diverge from planned target ({{ "%.1f"|format(log_analysis.total_planned_hours) }}h) with {{ log_analysis.missed_sessions }} missed blocks. We recommend adapting your planner to avoid study fatigue.</p>
+            </div>
+            <form action="{{ url_for('student.planner_adapt_regenerate') }}" method="POST" class="mb-0">
+                <button type="submit" class="btn btn-warning py-2.5 px-4"><i class="fas fa-sync-alt me-1"></i> Adapt & Regenerate</button>
+            </form>
+        </div>
+        {% endif %}
+        
+        <!-- Subject Priorities Table -->
+        <div class="card card-flat p-4 mb-4">
+            <h5 class="mb-3 text-gradient"><i class="fas fa-list-ol me-2"></i> Subject Priorities</h5>
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th>Subject</th>
+                            <th>Marks</th>
+                            <th>Weight Priority</th>
+                            <th>Daily focus</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for sp in planner.subject_priorities %}
+                        <tr>
+                            <td class="fw-bold" style="color: #1a1a2e;">
+                                {% set sub_id = subject_ids.get(sp.subject) or subject_ids.get(sp.subject.lower()) %}
+                                {% if sub_id %}
+                                <a href="{{ url_for('student.study_subject', subject_id=sub_id) }}" class="fw-bold text-gradient text-decoration-none" title="Open LMS Study Room"><i class="fas fa-book-reader me-1 text-primary"></i> {{ sp.subject }}</a>
+                                {% else %}
+                                {{ sp.subject }}
+                                {% endif %}
+                            </td>
+                            <td>{{ sp.mark }}/100</td>
+                            <td>
+                                <span class="badge 
+                                    {% if sp.priority == 'Critical' %}bg-danger
+                                    {% elif sp.priority == 'Weak' %}bg-warning text-dark
+                                    {% elif sp.priority == 'Average' %}bg-primary
+                                    {% else %}bg-success{% endif %}">
+                                    {{ sp.priority }}
+                                </span>
+                            </td>
+                            <td class="text-muted small">{{ sp.focus_tip }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Weekly Schedule Accordion -->
+        <div class="card card-light p-4">
+            <h5 class="mb-3 text-gradient"><i class="fas fa-calendar-alt me-2"></i> Weekly Study Schedule</h5>
+            
+            <div class="accordion" id="scheduleAccordion">
+                {% for day, day_subjects in planner.schedule.items() %}
+                <div class="accordion-item" style="border: 1px solid #e2e8f0; border-radius: 8px; margin-bottom: 0.5rem; overflow: hidden;">
+                    <h2 class="accordion-header" id="heading-{{ day }}">
+                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-{{ day }}" aria-expanded="false" style="font-weight: 600; color: #1a1a2e; background: #f8fafc;">
+                            <i class="far fa-calendar-check me-2 text-primary"></i> {{ day }}
+                            <span class="ms-auto badge bg-secondary text-dark fs-7 no-print" style="margin-right: 1.5rem;">
+                                {{ day_subjects|length }} blocks
+                            </span>
+                        </button>
+                    </h2>
+                    <div id="collapse-{{ day }}" class="accordion-collapse collapse" aria-labelledby="heading-{{ day }}" data-bs-parent="#scheduleAccordion">
+                        <div class="accordion-body bg-white">
+                            <div class="list-group list-group-flush">
+                                {% for slot in day_subjects %}
+                                <div class="list-group-item d-flex align-items-center justify-content-between py-3 border-0 border-bottom">
+                                    <div class="d-flex align-items-center gap-3">
+                                        <!-- Checkbox -->
+                                        <div class="form-check fs-5 no-print">
+                                            <input class="form-check-input planner-checkbox" type="checkbox" 
+                                                id="chk-{{ day }}-{{ loop.index }}" 
+                                                data-day="{{ day }}" 
+                                                data-index="{{ loop.index }}"
+                                                data-subject="{{ slot.subject }}" 
+                                                data-hours="{{ slot.hours }}"
+                                                onchange="updateProgress(this)">
+                                        </div>
+                                        <div>
+                                            <h6 class="mb-1 fw-bold" id="title-{{ day }}-{{ loop.index }}" style="color: #1a1a2e;">
+                                                {% set sub_id = subject_ids.get(slot.subject) or subject_ids.get(slot.subject.lower()) %}
+                                                {% if sub_id %}
+                                                <a href="{{ url_for('student.study_subject', subject_id=sub_id) }}" class="fw-bold text-gradient text-decoration-none" title="Open LMS Study Room"><i class="fas fa-book-reader me-1 text-primary"></i> {{ slot.subject }}</a>
+                                                {% else %}
+                                                {{ slot.subject }}
+                                                {% endif %}
+                                                <span class="badge ms-2 
+                                                    {% if slot.priority == 'Critical' or slot.priority == 'Revision' %}bg-danger
+                                                    {% elif slot.priority == 'Weak' %}bg-warning text-dark
+                                                    {% elif slot.priority == 'Test' %}bg-purple text-white
+                                                    {% elif slot.priority == 'Average' %}bg-primary
+                                                    {% else %}bg-success{% endif %}" style="font-size: 0.65rem;">
+                                                    {{ slot.priority }}
+                                                </span>
+                                            </h6>
+                                            <p class="mb-0 text-muted small"><i class="far fa-lightbulb me-1"></i> {{ slot.focus_tip }}</p>
+                                        </div>
+                                    </div>
+                                    <div class="text-end">
+                                        {% if slot.start_time and slot.end_time %}
+                                        <span class="fw-bold text-primary"><i class="far fa-clock me-1"></i> {{ slot.start_time }} - {{ slot.end_time }}</span>
+                                        {% else %}
+                                        <span class="fw-bold text-primary">{{ slot.hours }} hrs</span>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // On load, restore checkbox state and expand today's accordion
+    document.addEventListener("DOMContentLoaded", function() {
+        const checkboxes = document.querySelectorAll(".planner-checkbox");
+        checkboxes.forEach(function(chk) {
+            const key = "planner-chk-" + "{{ current_user.id }}-" + chk.dataset.day + "-" + chk.dataset.index;
+            const isChecked = localStorage.getItem(key) === "true";
+            chk.checked = isChecked;
+            
+            // Apply text strike-through style if checked
+            const textHeader = document.getElementById("title-" + chk.dataset.day + "-" + chk.dataset.index);
+            if (textHeader && isChecked) {
+                textHeader.style.textDecoration = "line-through";
+                textHeader.style.opacity = "0.6";
+            }
+        });
+        
+        // Expand today's day accordion automatically
+        const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+        const todayDay = days[new Date().getDay()];
+        const todayHeader = document.getElementById("collapse-" + todayDay);
+        if (todayHeader) {
+            todayHeader.classList.add("show");
+            const btn = document.querySelector(`button[data-bs-target="#collapse-${todayDay}"]`);
+            if (btn) btn.classList.remove("collapsed");
+        }
+        
+        recalculateProgress();
+    });
+
+    function updateProgress(chk) {
+        const key = "planner-chk-" + "{{ current_user.id }}-" + chk.dataset.day + "-" + chk.dataset.index;
+        localStorage.setItem(key, chk.checked);
+        
+        const textHeader = document.getElementById("title-" + chk.dataset.day + "-" + chk.dataset.index);
+        if (textHeader) {
+            if (chk.checked) {
+                textHeader.style.textDecoration = "line-through";
+                textHeader.style.opacity = "0.6";
+                
+                // Prompt to log to database StudyLog
+                if (confirm(`Great job! Would you like to log this completed ${chk.dataset.hours} hour study session for ${chk.dataset.subject} into your dashboard Study Log?`)) {
+                    logSessionToDb(chk.dataset.subject, chk.dataset.hours);
+                }
+            } else {
+                textHeader.style.textDecoration = "none";
+                textHeader.style.opacity = "1.0";
+            }
+        }
+        
+        recalculateProgress();
+    }
+
+    function recalculateProgress() {
+        const checkboxes = document.querySelectorAll(".planner-checkbox");
+        const total = checkboxes.length;
+        let checked = 0;
+        
+        checkboxes.forEach(function(chk) {
+            if (chk.checked) checked++;
+        });
+        
+        const pct = total > 0 ? Math.round((checked / total) * 100) : 0;
+        const progressBar = document.getElementById("overall-progress-bar");
+        if(progressBar) {
+            progressBar.style.width = pct + "%";
+        }
+        
+        const text = document.getElementById("progress-text");
+        if(text) {
+            text.innerText = `${checked} / ${total} sessions completed this week (${pct}%)`;
+        }
+    }
+
+    function logSessionToDb(subject, hours) {
+        const formData = new FormData();
+        formData.append("subject", subject);
+        formData.append("hours", hours);
+        
+        fetch("{{ url_for('student.planner_log_hours') }}", {
+            method: "POST",
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === "success") {
+                // Show a brief toast style notification or simple alert
+                console.log(data.message);
+            }
+        })
+        .catch(err => console.error("Error logging study hour:", err));
+    }
+</script>
+</div>
+{% endblock %}

@@ -1,0 +1,1609 @@
+{% extends 'base.html' %}
+{% block title %}Study Planner{% endblock %}
+
+{% block content %}
+<div class="px-4 py-4">
+<div id="plannerLoading" class="planner-loading">
+    <div class="planner-loading-spinner"></div>
+    <p class="text-muted">Running Random Forest predictions & building your week...</p>
+</div>
+
+<div class="planner-hero stagger-1">
+    <div class="hero-glow-orb" style="left: -50px; top: -50px;"></div>
+    <div class="row align-items-center">
+        <div class="col-lg-7">
+            <h1 class="page-title mb-2"><i class="fas fa-calendar-alt me-2 text-gradient"></i> Adaptive Study Planner</h1>
+            <p class="page-subtitle mb-0">
+                ML-powered scheduling that weights subject risk, difficulty, attendance, and grades — then allocates your weekly study blocks automatically.
+            </p>
+        </div>
+        <div class="col-lg-5 mt-4 mt-lg-0">
+            <div class="planner-stats">
+                <div class="planner-stat-pill"><i class="fas fa-clock text-gradient"></i> {{ total_week_hours }}h planned</div>
+                <div class="planner-stat-pill"><i class="fas fa-layer-group text-gradient"></i> {{ schedule_count }} sessions</div>
+                <div class="planner-stat-pill"><i class="fas fa-exclamation-circle" style="color: var(--red);"></i> {{ risk_counts.high }} high</div>
+                <div class="planner-stat-pill"><i class="fas fa-check-circle" style="color: var(--green);"></i> {{ risk_counts.low }} low</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% if not profile.study_level %}
+<div class="alert alert-warning text-center mb-4 stagger-2">
+    <i class="fas fa-exclamation-triangle me-2"></i>
+    Set your class level in <a href="{{ url_for('student.profile') }}" class="alert-link">Profile</a> to see your subjects.
+</div>
+{% endif %}
+
+<!-- ── Focus Planning Stepper Bar ── -->
+
+<div class="ss-planner-stepper mb-4 stagger-2">
+    <div class="ss-stepper-step active">
+        <div class="ss-stepper-num">01</div>
+        <span>01 Subjects</span>
+    </div>
+    <div class="ss-stepper-divider"></div>
+    <div class="ss-stepper-step">
+        <div class="ss-stepper-num">02</div>
+        <span>02 Availability</span>
+    </div>
+    <div class="ss-stepper-divider"></div>
+    <div class="ss-stepper-step">
+        <div class="ss-stepper-num">03</div>
+        <span>03 Priorities</span>
+    </div>
+    <div class="ss-stepper-divider"></div>
+    <div class="ss-stepper-step">
+        <div class="ss-stepper-num">04</div>
+        <span>04 Generate</span>
+    </div>
+</div>
+
+<div class="row g-4 mb-4 stagger-2">
+
+    <div class="col-12">
+        <div class="card card-flat p-4">
+            <h5 class="text-gradient fw-bold mb-1"><i class="fas fa-sliders-h me-2"></i> Configure Your Plan</h5>
+            <p class="text-muted small mb-4">Add subjects and let the model predict risk levels for smart hour allocation.</p>
+
+            <form action="{{ url_for('student.generate_schedule') }}" method="POST" id="planner-form">
+
+
+                <!-- Session length presets -->
+                <div class="mb-4">
+                    <label class="form-label d-flex align-items-center gap-2">
+                        Session Length
+                        <span class="badge" style="background:rgba(245,158,11,0.15);color:#fcd34d;border:1px solid rgba(245,158,11,0.3);font-size:11px;">Max 2 h/slot recommended</span>
+                    </label>
+                    <input type="hidden" name="session_length" id="session-length-input" value="60">
+                    <div class="d-flex flex-wrap gap-2" id="session-preset-btns">
+                        <button type="button" class="btn btn-sm btn-outline-secondary session-preset" data-mins="30">30 min</button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary session-preset" data-mins="45">45 min</button>
+                        <button type="button" class="btn btn-sm btn-outline-primary session-preset active" data-mins="60">60 min ✓</button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary session-preset" data-mins="90">90 min</button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary session-preset" data-mins="120">2 h</button>
+                    </div>
+                </div>
+
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <label class="form-label mb-0">Your subjects</label>
+                    <div class="d-flex gap-2">
+                        {% if subjects %}
+                        <button type="button" class="btn btn-outline-success btn-sm" onclick="autoFillSubjects()">
+                            <i class="fas fa-magic me-1"></i> Auto-fill from Profile
+                        </button>
+                        {% endif %}
+                        <button type="button" class="btn btn-outline-primary btn-sm" id="add-subject-btn">
+                            <i class="fas fa-plus me-1"></i> Add
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Subject data must be defined BEFORE subjects-container is populated by JS -->
+                <script>
+                var PROFILE_SUBJECTS = [
+                    {% for s in subjects %}
+                    {% set dt = get_subject_profile_details(current_user.id, s.id, s.name) %}
+                    { name: "{{ s.name }}", difficulty: {{ s.difficulty_level or 3 }}, score: {{ "%.1f"|format(dt.score) if dt.score is not none else 'null' }}, attendance: {{ dt.attendance }}, study_hours: {{ dt.study_hours }}, days_until_exam: {{ dt.days_until_exam }} },
+                    {% endfor %}
+                ];
+                var ALL_SUBJECT_NAMES = PROFILE_SUBJECTS.map(s => s.name);
+                {% if draft_subjects %}
+                var DRAFT_SUBJECTS = {{ draft_subjects | tojson }};
+                {% else %}
+                var DRAFT_SUBJECTS = null;
+                {% endif %}
+                </script>
+
+                <!-- Inline validation error banner -->
+                <div id="subject-validation-error" class="alert alert-danger py-2 px-3 mb-2 d-none" role="alert">
+                    <i class="fas fa-exclamation-circle me-2"></i>
+                    <span id="subject-validation-msg">Please correct the highlighted fields.</span>
+                </div>
+
+                <!-- subjects-container: all rows built by buildNewRow() in JS -->
+                <div id="subjects-container"></div>
+
+                <style>
+                    /* Visual Timeline styles */
+                    .timeline-container {
+                        display: flex;
+                        width: 100%;
+                        height: 20px;
+                        border-radius: 4px;
+                        overflow: hidden;
+                        border: 1px solid #cbd5e1;
+                        background: #f1f5f9;
+                    }
+                    .timeline-hour-block {
+                        flex: 1;
+                        height: 100%;
+                        border-right: 1px solid rgba(255, 255, 255, 0.4);
+                    }
+                    .timeline-hour-block:last-child {
+                        border-right: none;
+                    }
+                    /* 7-category timeline block colours */
+                    .bg-sleep-block          { background-color: #a855f7 !important; } /* Purple  */
+                    .bg-class-block          { background-color: #3b82f6 !important; } /* Blue    */
+                    .bg-sports-block         { background-color: #f97316 !important; } /* Orange  */
+                    .bg-social-block         { background-color: #ec4899 !important; } /* Pink    */
+                    .bg-entertainment-block  { background-color: #ef4444 !important; } /* Red     */
+                    .bg-chores-block         { background-color: #eab308 !important; } /* Yellow  */
+                    .bg-other-block          { background-color: #94a3b8 !important; } /* Gray    */
+                    .bg-study-block          { background-color: #34d399 !important; } /* Green (free) */
+                    .bg-busy-block           { background-color: #94a3b8 !important; } /* fallback gray */
+                </style>
+
+                <!-- NEW: Available Days and Times Grid -->
+                <input type="hidden" name="free_slots_json" id="free-slots-json">
+                
+                <!-- SECTION 2: Multiple Study Slot System -->
+                <div class="card card-light p-4 mb-4 border-0 shadow-none bg-transparent px-0">
+                    <h5 class="text-gradient fw-bold mb-3"><i class="fas fa-calendar-alt me-2"></i> Availability Slots</h5>
+                    
+                    <!-- Warning alert banner -->
+                    <div id="availability-warning-alert" class="alert alert-warning mb-3 d-none border-0 shadow-sm" style="background: #fffbeb; color: #b45309;">
+                        <i class="fas fa-exclamation-triangle me-2"></i> <strong>Warning:</strong> Your available study hours (<span id="warn-avail-hours">0.0</span> hrs) are lower than your weekly target (<span id="warn-target-hours">0.0</span> hrs). Please add more study slots or adjust your target.
+                    </div>
+
+                    <div class="row g-3 mb-4 align-items-center">
+                        <div class="col-md-6">
+                            <label class="form-label text-dark fw-bold mb-1"><i class="fas fa-magic text-primary me-1"></i> Apply Availability Preset</label>
+                            <select class="form-select border-secondary text-dark" id="availability-preset-select" onchange="applyPresetTemplate(this.value)">
+                                <option value="" disabled selected>-- Select a Preset --</option>
+                                <option value="balanced">Balanced school day pattern</option>
+                                <option value="fulltime">Full-time campus pattern</option>
+                                <option value="parttime">Part-time work pattern</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6 text-md-end mt-3 mt-md-0">
+                            <div class="h6 mb-0 text-dark">
+                                Available Study Time: <span class="badge bg-success fs-6" id="total-study-hours-badge">0.0 hrs/week</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Quick slot preset buttons -->
+                    <div class="mb-3">
+                        <label class="form-label text-muted small fw-bold">Quick Edit for Selected Day</label>
+                        <div class="d-flex flex-wrap gap-2">
+                            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="quickFillDay('morning')">
+                                <i class="fas fa-sun me-1 text-warning"></i> Morning (6–9 AM)
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="quickFillDay('afternoon')">
+                                <i class="fas fa-cloud-sun me-1 text-info"></i> Afternoon (2–5 PM)
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="quickFillDay('evening')">
+                                <i class="fas fa-moon me-1 text-primary"></i> Evening (6–9 PM)
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-danger" onclick="clearDaySlots()">
+                                <i class="fas fa-trash me-1"></i> Clear Commitments
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Timeline visual preview -->
+                    <div class="mb-4">
+                        <label class="form-label text-dark fw-bold mb-2"><i class="fas fa-eye text-primary me-1"></i> Availability Preview (Timeline)</label>
+                        <div class="d-flex flex-wrap gap-2 mb-2">
+                            <span class="badge" style="background:#34d399;color:#064e3b;">Available Study Time</span>
+                            <span class="badge" style="background:#a855f7;">🟣 Sleep</span>
+                            <span class="badge" style="background:#3b82f6;">🔵 Class/Academic</span>
+                            <span class="badge" style="background:#f97316;">🟠 Sports</span>
+                            <span class="badge" style="background:#ec4899;">🩷 Social/Hangout</span>
+                            <span class="badge" style="background:#ef4444;">🔴 Entertainment</span>
+                            <span class="badge" style="background:#eab308;color:#422006;">🟡 Personal/Chores</span>
+                            <span class="badge" style="background:#94a3b8;color:#1e293b;">⬜ Other</span>
+                        </div>
+                        <div class="table-responsive border rounded bg-white p-3">
+                            <table class="table table-borderless table-sm mb-0">
+                                <thead>
+                                    <tr>
+                                        <th style="width: 60px;" class="small text-muted py-0">Day</th>
+                                        <th class="small text-muted py-0">12 AM - 11 PM Timeline Blocks</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="timeline-preview-body">
+                                    <!-- Dynamic timelines generated by JS -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    
+                    <!-- Dynamic Commitments Summary Widget -->
+                    <div class="mb-4">
+                        <label class="form-label text-dark fw-bold mb-2"><i class="fas fa-chart-pie text-primary me-1"></i> Weekly Commitments Summary</label>
+                        <div id="weekly-commitments-summary-container" class="d-flex flex-wrap gap-2">
+                            <!-- Generated dynamically by JS -->
+                        </div>
+                    </div>
+
+                    <!-- Day Selection Tabs and Slot Editor -->
+                    <div class="mb-3">
+                        <label class="form-label text-dark fw-bold mb-2"><i class="fas fa-edit text-primary me-1"></i> Edit Slots</label>
+                        <div class="d-flex flex-wrap gap-1 mb-3" id="day-tabs-container">
+                            <!-- Sunday - Saturday tab buttons -->
+                        </div>
+                        
+                        <div class="card p-3 border bg-white shadow-sm">
+                            <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+                                <h6 class="mb-0 text-dark fw-bold"><i class="far fa-clock text-primary me-2"></i> Slots for <span id="current-day-label">Sunday</span></h6>
+                                <button type="button" class="btn btn-outline-secondary btn-sm" onclick="copyCurrentDayToAll()">
+                                    <i class="far fa-copy me-1"></i> Copy to All Days
+                                </button>
+                            </div>
+                            
+                            <!-- Add slot form -->
+                            <div class="p-3 rounded border border-light mb-3" style="background: #f8fafc;">
+                                <div class="row g-2 align-items-end">
+                                    <div class="col-md-3">
+                                        <label class="form-label small text-muted mb-1">Category</label>
+                                        <select id="new-slot-type" class="form-select form-select-sm border-secondary text-dark" onchange="toggleCustomLabel(this.value,'sched')">
+                                            <option value="Sleep">🟣 Sleep</option>
+                                            <option value="Class/Academic">🔵 Class / Academic</option>
+                                            <option value="Sports">🟠 Sports</option>
+                                            <option value="Social/Hangout">🩷 Social / Hangout</option>
+                                            <option value="Entertainment">🔴 Entertainment</option>
+                                            <option value="Personal/Chores">🟡 Personal / Chores</option>
+                                            <option value="Other">⬜ Other</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label small text-muted mb-1">Start Time</label>
+                                        <input type="time" id="new-slot-start" class="form-control form-control-sm border-secondary text-dark" value="09:00">
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label small text-muted mb-1">End Time</label>
+                                        <input type="time" id="new-slot-end" class="form-control form-control-sm border-secondary text-dark" value="12:00">
+                                    </div>
+                                    <div class="col-md-3">
+                                        <button type="button" class="btn btn-primary btn-sm w-100 py-2 fw-bold" onclick="addNewSlot()">
+                                            <i class="fas fa-plus-circle me-1"></i> Add Slot
+                                        </button>
+                                    </div>
+                                </div>
+                                <!-- Other label row (hidden by default) -->
+                                <div class="row g-2 mt-1" id="sched-other-label-row" style="display:none!important;">
+                                    <div class="col-md-6">
+                                        <label class="form-label small text-muted mb-1">Label for "Other" <span class="text-muted">(e.g. Volunteering)</span></label>
+                                        <input type="text" id="new-slot-custom-label" class="form-control form-control-sm border-secondary text-dark" maxlength="80" placeholder="Describe this commitment…">
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Active Slots List -->
+                            <div class="list-group list-group-flush" id="day-slots-list" style="max-height: 250px; overflow-y: auto;">
+                                <!-- Filled by JS -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+         </div>
+
+                <!-- Risk Analysis & Study Hours Allocation Dashboard -->
+                <div id="risk-analysis-dashboard" class="d-none mt-4 p-4 rounded-3 border bg-white shadow-sm stagger-3">
+                    <h5 class="text-gradient fw-bold mb-3"><i class="fas fa-chart-line me-2"></i> ML Prediction & Hour Allocation Summary</h5>
+                    <p class="text-muted small mb-3">Below are the real-time academic risk predictions and weekly study hours calculated automatically by the Random Forest model.</p>
+                    
+                    <div class="table-responsive mb-3 border rounded bg-light">
+                        <table class="table table-hover align-middle mb-0 text-dark">
+                            <thead>
+                                <tr class="table-secondary">
+                                    <th class="fw-bold">Subject</th>
+                                    <th class="fw-bold text-center">Predicted Risk</th>
+                                    <th class="fw-bold text-center">Allocated Weekly Hours</th>
+                                </tr>
+                            </thead>
+                            <tbody id="risk-analysis-table-body">
+                                <!-- Populated dynamically -->
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="row align-items-center mb-3">
+                        <div class="col-md-6">
+                            <span class="fw-bold text-dark">Total Recommended Hours:</span>
+                            <span class="badge bg-primary fs-6 ms-2" id="dashboard-total-hours">0.0 hrs/week</span>
+                        </div>
+                        <div class="col-md-6 text-md-end">
+                            <span class="fw-bold text-dark">Available Slots:</span>
+                            <span class="badge bg-secondary fs-6 ms-2" id="dashboard-available-hours">0.0 hrs/week</span>
+                        </div>
+                    </div>
+
+                    <div id="dashboard-warning-banner" class="alert mb-3 border-0 d-none">
+                        <!-- Warning details -->
+                    </div>
+                </div>
+
+                <div id="analyze-button-container" class="mt-4">
+                    <button type="button" class="btn btn-primary btn-glow w-100 py-3" onclick="runRiskAnalysis()">
+                        <i class="fas fa-chart-bar me-2"></i> Run Risk & Hour Analysis
+                    </button>
+                </div>
+                
+                <div id="generate-button-container" class="d-none mt-3">
+                    <button type="submit" class="btn btn-generate-plan w-100">
+                        <i class="fas fa-sparkles me-1"></i> GENERATE MY ADAPTIVE STUDY PLAN
+                    </button>
+                </div>
+
+            </form>
+        </div>
+    </div>
+
+    <div class="col-12">
+        <div class="card card-flat p-4">
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
+                <h5 class="text-gradient fw-bold mb-0"><i class="fas fa-calendar-week me-2"></i> Your Week</h5>
+                <div class="risk-legend">
+                    <span><span class="risk-dot high"></span> High risk</span>
+                    <span><span class="risk-dot medium"></span> Medium</span>
+                    <span><span class="risk-dot low"></span> Low risk</span>
+                </div>
+            </div>
+
+            {% set days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'] %}
+            <div class="week-grid-container">
+                <div class="week-grid">
+                    {% for day_idx in range(7) %}
+                    <div class="day-column {% if day_idx == today_idx %}today{% endif %}">
+                        <div class="day-header">
+                            {{ days[day_idx] }}
+                            {% if day_idx == today_idx %}<div class="today-badge">Today</div>{% endif %}
+                        </div>
+                        {% set slots = weekly_schedule.get(day_idx, []) %}
+                        {% if slots|length == 0 %}
+                        <div class="empty-day">
+                            <i class="fas fa-moon"></i>
+                            Rest day
+                        </div>
+                        {% else %}
+                        {% for slot in slots %}
+                        {% set risk_class = 'risk-medium' %}
+                        {% if 'High Risk' in slot.description %}{% set risk_class = 'risk-high' %}
+                        {% elif 'Low Risk' in slot.description %}{% set risk_class = 'risk-low' %}
+                        {% endif %}
+                        <div class="schedule-card {{ risk_class }}">
+                            <div class="schedule-time">
+                                <i class="far fa-clock me-1"></i>
+                                {{ slot.start_time.strftime('%I:%M %p') }} – {{ slot.end_time.strftime('%I:%M %p') }}
+                            </div>
+                            <div class="schedule-subject">{{ slot.subject_name }}</div>
+                            <div class="small text-muted mt-1">{{ slot.description }}</div>
+                        </div>
+                        {% endfor %}
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<template id="subject-row-template">
+    <div class="subject-row border rounded p-2 mb-2 position-relative">
+        <button type="button" class="btn btn-sm btn-outline-danger remove-btn position-absolute" style="top:8px;right:8px;z-index:1;" title="Remove row"><i class="fas fa-times"></i></button>
+        <div class="row g-2">
+            <div class="col-12">
+                <label class="form-label text-muted small fw-semibold">Subject *</label>
+                <select name="subject_name[]" class="form-select form-select-sm subject-select" required>
+                    <option value="">-- Select subject --</option>
+                </select>
+                <div class="invalid-feedback subject-feedback">⚠ Please select a subject.</div>
+                <div class="no-assessment-warning d-none"></div>
+            </div>
+            <div class="col-6">
+                <label class="form-label text-muted small fw-semibold">Grade % <span class="badge bg-secondary ms-1" style="font-size:10px;">Auto</span></label>
+                <input type="number" name="previous_grade[]" class="form-control form-control-sm grade-input" required min="0" max="100" step="0.1" value="" placeholder="From assessment" readonly style="background-color: rgba(255,255,255,0.06); cursor: not-allowed;">
+                <div class="invalid-feedback grade-feedback">⚠ Grade must be 0–100%. Take an assessment first.</div>
+            </div>
+            <div class="col-6">
+                <label class="form-label text-muted small fw-semibold">Attendance % *</label>
+                <input type="number" name="attendance[]" class="form-control form-control-sm att-input" required min="0" max="100" step="0.1" value="85" placeholder="0–100" inputmode="decimal">
+                <div class="invalid-feedback att-feedback">⚠ Attendance must be between 0% and 100%.</div>
+            </div>
+            <div class="col-6">
+                <label class="form-label text-muted small fw-semibold">Current Study Hours/Week *</label>
+                <input type="number" name="study_hours[]" class="form-control form-control-sm hours-input" required min="0" max="84" step="0.5" value="6" placeholder="0–84" inputmode="decimal">
+                <div class="form-text text-muted" style="font-size:11px; line-height:1.2;">This is how much you currently study. The model uses it to calculate what you actually need.</div>
+                <div class="invalid-feedback hours-feedback">⚠ Study hours per week must be between 0 and 84.</div>
+            </div>
+            <div class="col-6">
+                <label class="form-label text-muted small fw-semibold">Days until Exam *</label>
+                <input type="number" name="days_until_exam[]" class="form-control form-control-sm days-input" required min="1" max="365" step="1" value="30" placeholder="1–365" inputmode="numeric">
+                <div class="invalid-feedback days-feedback">⚠ Days until exam must be a whole number between 1 and 365.</div>
+            </div>
+            <div class="col-12">
+                <label class="form-label text-muted small fw-semibold">Difficulty <span class="badge bg-secondary ms-1" style="font-size:10px;">Auto-derived</span></label>
+                <input type="hidden" name="difficulty[]" class="difficulty-hidden" value="3">
+                <select class="form-select form-select-sm difficulty-display" disabled style="background-color: rgba(255,255,255,0.06); cursor: not-allowed;">
+                    <option value="1">1 · Easy</option>
+                    <option value="2">2 · Light</option>
+                    <option value="3" selected>3 · Moderate</option>
+                    <option value="4">4 · Hard</option>
+                    <option value="5">5 · Very Hard</option>
+                </select>
+            </div>
+        </div>
+    </div>
+</template>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let allUserSlots = [];
+    let currentSelectedDay = "Sunday";
+    const DAYS_GRID = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+    document.addEventListener("DOMContentLoaded", function() {
+        if (document.getElementById("timeline-preview-body")) {
+            initSlotTabs();
+            loadSlotsFromServer();
+
+            // Seed the initial subject row (same as Add click) so first row = dropdown with remove btn
+            const container = document.getElementById("subjects-container");
+            if (container && container.children.length === 0) {
+                const firstRow = buildNewRow();
+                container.appendChild(firstRow);
+                refreshAllSelects();
+            }
+            
+            const form = document.getElementById("planner-form");
+            if (form) {
+                form.addEventListener("submit", function(e) {
+                    if (!validateAllSubjectRows()) {
+                        e.preventDefault();
+                        return false;
+                    }
+
+                    const gridMap = serializeSlotsToGrid();
+                    document.getElementById("free-slots-json").value = JSON.stringify(gridMap);
+                });
+            }
+
+            const addBtn = document.getElementById("add-subject-btn");
+            if (addBtn) {
+                addBtn.addEventListener("click", function() {
+                    const row = buildNewRow();
+                    container.appendChild(row);
+                    refreshAllSelects();
+                });
+            }
+
+            // Add listeners to level-specific inputs to dynamically trigger target calculation
+            document.body.addEventListener("input", function(e) {
+                if (e.target.name === "weekly_study_hours" || e.target.name === "study_hours" || e.target.name === "daily_study_hours") {
+                    calculateStudyHours();
+                }
+            });
+
+            // Wire up session preset buttons
+            document.querySelectorAll("[data-preset]").forEach(btn => {
+                btn.addEventListener("click", () => applyPresetTemplate(btn.getAttribute("data-preset")));
+            });
+        }
+    });
+
+    // ── Session length preset buttons ────────────────────────────────────────
+    document.addEventListener("click", function(e) {
+        const btn = e.target.closest(".session-preset");
+        if (!btn) return;
+        document.querySelectorAll(".session-preset").forEach(b => {
+            b.classList.remove("btn-outline-primary", "active");
+            b.classList.add("btn-outline-secondary");
+            b.textContent = b.textContent.replace(" ✓", "");
+        });
+        btn.classList.remove("btn-outline-secondary");
+        btn.classList.add("btn-outline-primary", "active");
+        btn.textContent += " ✓";
+        document.getElementById("session-length-input").value = btn.dataset.mins;
+    });
+
+    // ── Subject exclusivity helpers ────────────────────────────────────────
+    function getUsedSubjects(excludeRow) {
+        const used = new Set();
+        document.querySelectorAll('#subjects-container .subject-row').forEach(row => {
+            if (row === excludeRow) return;
+            const sel = row.querySelector('select.subject-select');
+            if (sel && sel.value) used.add(sel.value);
+        });
+        return used;
+    }
+
+    function refreshAllSelects() {
+        const rows = document.querySelectorAll('#subjects-container .subject-row');
+        rows.forEach(row => {
+            const sel = row.querySelector('select.subject-select');
+            if (!sel) return;
+            const current = sel.value;
+            const used = getUsedSubjects(row);
+            Array.from(sel.options).forEach(opt => {
+                if (!opt.value) return; // keep placeholder
+                const shouldHide = used.has(opt.value) && opt.value !== current;
+                opt.disabled = shouldHide;
+                opt.hidden = shouldHide;
+                if (shouldHide) {
+                    opt.style.display = 'none';
+                } else {
+                    opt.style.display = '';
+                }
+            });
+        });
+    }
+
+    function wireSubjectSelect(sel) {
+        sel.addEventListener('change', function() {
+            const row = this.closest('.subject-row');
+            if (!row) return;
+
+            const name = this.value;
+            const gradeInput = row.querySelector('input[name="previous_grade[]"]');
+            const diffDisplay = row.querySelector('.difficulty-display');
+            const diffHidden = row.querySelector('.difficulty-hidden');
+            const warnBox = row.querySelector('.no-assessment-warning');
+
+            const subjObj = (window.PROFILE_SUBJECTS || []).find(s => s.name === name);
+
+            if (subjObj && subjObj.score !== null && subjObj.score !== undefined) {
+                const score = parseFloat(subjObj.score);
+                if (gradeInput) {
+                    gradeInput.value = score.toFixed(1);
+                    gradeInput.classList.remove('is-invalid');
+                }
+
+                // Derive difficulty from grade %: <40% -> 4 (Hard), 40-70% -> 3 (Moderate), >70% -> 2 (Easy)
+                let derivedDiff = 3;
+                if (score < 40.0) derivedDiff = 4;
+                else if (score > 70.0) derivedDiff = 2;
+                else derivedDiff = 3;
+
+                if (diffDisplay) diffDisplay.value = derivedDiff.toString();
+                if (diffHidden) diffHidden.value = derivedDiff.toString();
+
+                if (warnBox) {
+                    warnBox.className = 'no-assessment-warning d-none';
+                    warnBox.innerHTML = '';
+                }
+            } else if (name) {
+                if (gradeInput) {
+                    gradeInput.value = '';
+                    gradeInput.classList.add('is-invalid');
+                }
+                if (warnBox) {
+                    warnBox.className = 'no-assessment-warning alert alert-warning py-1 px-2 mt-1 mb-0 small';
+                    warnBox.style.background = '#fffbeb';
+                    warnBox.style.color = '#b45309';
+                    warnBox.style.border = '1px solid #fde68a';
+                    warnBox.innerHTML = '<i class="fas fa-exclamation-triangle me-1"></i> Take an assessment in this subject first';
+                }
+            } else {
+                if (gradeInput) gradeInput.value = '';
+                if (warnBox) {
+                    warnBox.className = 'no-assessment-warning d-none';
+                    warnBox.innerHTML = '';
+                }
+            }
+            refreshAllSelects();
+        });
+    }
+
+    // ── Auto-fill subject rows from profile or session draft ──────────────────
+    function autoFillSubjects() {
+        if (window.DRAFT_SUBJECTS && Array.isArray(window.DRAFT_SUBJECTS) && window.DRAFT_SUBJECTS.length > 0) {
+            const container = document.getElementById("subjects-container");
+            container.innerHTML = "";
+
+            window.DRAFT_SUBJECTS.forEach(s => {
+                const row = buildNewRow();
+                const sel = row.querySelector('select.subject-select');
+                const attInput = row.querySelector('input[name="attendance[]"]');
+                const hoursInput = row.querySelector('input[name="study_hours[]"]');
+                const examDaysInput = row.querySelector('input[name="days_until_exam[]"]');
+
+                if (sel) {
+                    sel.value = s.name;
+                    sel.dispatchEvent(new Event('change'));
+                }
+                if (attInput && s.attendance !== undefined) attInput.value = s.attendance;
+                if (hoursInput && s.study_hours !== undefined) hoursInput.value = s.study_hours;
+                if (examDaysInput && s.days_until_exam !== undefined) examDaysInput.value = s.days_until_exam;
+
+                container.appendChild(row);
+            });
+            refreshAllSelects();
+            return;
+        }
+
+        if (!window.PROFILE_SUBJECTS || PROFILE_SUBJECTS.length === 0) {
+            alert("No profile subjects found. Set your study level in Profile first.");
+            return;
+        }
+
+        const assessedSubjects = PROFILE_SUBJECTS.filter(s => s.score !== null && s.score !== undefined);
+        if (assessedSubjects.length === 0) {
+            alert("No completed assessment data found for your profile subjects. Take an assessment in at least one subject first.");
+            return;
+        }
+
+        const container = document.getElementById("subjects-container");
+        container.innerHTML = "";
+
+        assessedSubjects.forEach(s => {
+            const row = buildNewRow();
+            const sel = row.querySelector('select.subject-select');
+            const attInput = row.querySelector('input[name="attendance[]"]');
+            const hoursInput = row.querySelector('input[name="study_hours[]"]');
+            const examDaysInput = row.querySelector('input[name="days_until_exam[]"]');
+
+            if (sel) {
+                sel.value = s.name;
+                sel.dispatchEvent(new Event('change'));
+            }
+            if (attInput && s.attendance !== undefined && s.attendance !== null) attInput.value = s.attendance;
+            if (hoursInput && s.study_hours !== undefined && s.study_hours !== null) hoursInput.value = s.study_hours;
+            if (examDaysInput && s.days_until_exam !== undefined && s.days_until_exam !== null) examDaysInput.value = s.days_until_exam;
+
+            container.appendChild(row);
+        });
+        refreshAllSelects();
+    }
+
+    function buildNewRow() {
+        const frag = document.getElementById("subject-row-template").content.cloneNode(true);
+        const row = frag.querySelector('.subject-row');
+
+        // Populate subject options from global list
+        const sel = row.querySelector('select.subject-select');
+        if (sel && window.ALL_SUBJECT_NAMES) {
+            ALL_SUBJECT_NAMES.forEach(name => {
+                const opt = document.createElement('option');
+                opt.value = name;
+                opt.textContent = name;
+                opt.dataset.difficulty = (PROFILE_SUBJECTS.find(s => s.name === name) || {}).difficulty || 3;
+                sel.appendChild(opt);
+            });
+        }
+
+        // Wire remove button
+        const removeBtn = row.querySelector(".remove-btn");
+        if (removeBtn) {
+            removeBtn.addEventListener("click", function() {
+                this.closest(".subject-row").remove();
+                refreshAllSelects();
+                const errBanner = document.getElementById('subject-validation-error');
+                if (errBanner && !document.querySelector('#subjects-container .is-invalid')) {
+                    errBanner.classList.add('d-none');
+                }
+            });
+        }
+        // Wire subject change
+        if (sel) wireSubjectSelect(sel);
+        wireRowValidation(row);
+        return row;
+    }
+
+    function validateField(inputEl, feedbackEl, validatorFn, errorMessage) {
+        if (!inputEl) return true;
+        const val = inputEl.value.trim();
+        const isValid = validatorFn(val);
+        if (!isValid) {
+            inputEl.classList.add('is-invalid');
+            if (feedbackEl) {
+                feedbackEl.textContent = errorMessage;
+                feedbackEl.style.display = 'block';
+            }
+            return false;
+        } else {
+            inputEl.classList.remove('is-invalid');
+            if (feedbackEl) {
+                feedbackEl.style.display = '';
+            }
+            return true;
+        }
+    }
+
+    function wireRowValidation(row) {
+        const nameSel = row.querySelector('select.subject-select');
+        const gradeInput = row.querySelector('.grade-input');
+        const attInput = row.querySelector('.att-input');
+        const hoursInput = row.querySelector('.hours-input');
+        const daysInput = row.querySelector('.days-input');
+
+        const nameFeedback = row.querySelector('.subject-feedback');
+        const gradeFeedback = row.querySelector('.grade-feedback');
+        const attFeedback = row.querySelector('.att-feedback');
+        const hoursFeedback = row.querySelector('.hours-feedback');
+        const daysFeedback = row.querySelector('.days-feedback');
+
+        const validateName = () => validateField(nameSel, nameFeedback, val => val !== "", "⚠ Please select a subject.");
+        const validateGrade = () => validateField(gradeInput, gradeFeedback, val => {
+            if (val === "") return false;
+            const num = parseFloat(val);
+            return !isNaN(num) && num >= 0 && num <= 100;
+        }, "⚠ Grade must be 0–100%. Take an assessment first.");
+        const validateAtt = () => validateField(attInput, attFeedback, val => {
+            if (val === "") return false;
+            const num = parseFloat(val);
+            return !isNaN(num) && num >= 0 && num <= 100;
+        }, "⚠ Attendance must be between 0% and 100%.");
+        const validateHours = () => validateField(hoursInput, hoursFeedback, val => {
+            if (val === "") return false;
+            const num = parseFloat(val);
+            return !isNaN(num) && num >= 0 && num <= 84;
+        }, "⚠ Study hours per week must be between 0 and 84.");
+        const validateDays = () => validateField(daysInput, daysFeedback, val => {
+            if (val === "") return false;
+            if (!/^\d+$/.test(val)) return false;
+            const num = parseInt(val, 10);
+            return num >= 1 && num <= 365;
+        }, "⚠ Days until exam must be a whole number between 1 and 365.");
+
+        if (nameSel) {
+            nameSel.addEventListener('blur', validateName);
+            nameSel.addEventListener('change', validateName);
+        }
+        if (gradeInput) {
+            gradeInput.addEventListener('blur', validateGrade);
+            gradeInput.addEventListener('input', validateGrade);
+        }
+        if (attInput) {
+            attInput.addEventListener('blur', validateAtt);
+            attInput.addEventListener('input', validateAtt);
+        }
+        if (hoursInput) {
+            hoursInput.addEventListener('blur', validateHours);
+            hoursInput.addEventListener('input', validateHours);
+        }
+        if (daysInput) {
+            daysInput.addEventListener('blur', validateDays);
+            daysInput.addEventListener('input', validateDays);
+        }
+    }
+
+    function validateAllSubjectRows() {
+        const rows = document.querySelectorAll('#subjects-container .subject-row');
+        let allValid = true;
+        let firstInvalidEl = null;
+
+        const errBanner = document.getElementById('subject-validation-error');
+        const errMsg = document.getElementById('subject-validation-msg');
+
+        if (rows.length === 0) {
+            if (errBanner && errMsg) {
+                errMsg.textContent = "⚠ Please add at least one subject to configure your plan.";
+                errBanner.classList.remove('d-none');
+            }
+            return false;
+        }
+
+        rows.forEach((row) => {
+            const nameSel = row.querySelector('select.subject-select');
+            const gradeInput = row.querySelector('.grade-input');
+            const attInput = row.querySelector('.att-input');
+            const hoursInput = row.querySelector('.hours-input');
+            const daysInput = row.querySelector('.days-input');
+
+            const nameFeedback = row.querySelector('.subject-feedback');
+            const gradeFeedback = row.querySelector('.grade-feedback');
+            const attFeedback = row.querySelector('.att-feedback');
+            const hoursFeedback = row.querySelector('.hours-feedback');
+            const daysFeedback = row.querySelector('.days-feedback');
+
+            const vName = validateField(nameSel, nameFeedback, val => val !== "", "⚠ Please select a subject.");
+            const vGrade = validateField(gradeInput, gradeFeedback, val => {
+                if (val === "") return false;
+                const num = parseFloat(val);
+                return !isNaN(num) && num >= 0 && num <= 100;
+            }, "⚠ Grade must be 0–100%. Take an assessment first.");
+
+            const vAtt = validateField(attInput, attFeedback, val => {
+                if (val === "") return false;
+                const num = parseFloat(val);
+                return !isNaN(num) && num >= 0 && num <= 100;
+            }, "⚠ Attendance must be between 0% and 100%.");
+
+            const vHours = validateField(hoursInput, hoursFeedback, val => {
+                if (val === "") return false;
+                const num = parseFloat(val);
+                return !isNaN(num) && num >= 0 && num <= 84;
+            }, "⚠ Study hours per week must be between 0 and 84.");
+
+            const vDays = validateField(daysInput, daysFeedback, val => {
+                if (val === "") return false;
+                if (!/^\d+$/.test(val)) return false;
+                const num = parseInt(val, 10);
+                return num >= 1 && num <= 365;
+            }, "⚠ Days until exam must be a whole number between 1 and 365.");
+
+            if (!vName || !vGrade || !vAtt || !vHours || !vDays) {
+                allValid = false;
+                if (!firstInvalidEl) {
+                    if (!vName) firstInvalidEl = nameSel;
+                    else if (!vGrade) firstInvalidEl = gradeInput;
+                    else if (!vAtt) firstInvalidEl = attInput;
+                    else if (!vHours) firstInvalidEl = hoursInput;
+                    else if (!vDays) firstInvalidEl = daysInput;
+                }
+            }
+        });
+
+        const sessionInput = document.getElementById('session-length-input');
+        if (sessionInput) {
+            const sessVal = parseInt(sessionInput.value, 10);
+            if (isNaN(sessVal) || ![30, 45, 60, 90, 120].includes(sessVal)) {
+                allValid = false;
+            }
+        }
+
+        if (!allValid) {
+            if (errBanner && errMsg) {
+                errMsg.textContent = "⚠ Please correct the highlighted fields before generating your study plan.";
+                errBanner.classList.remove('d-none');
+            }
+            if (firstInvalidEl) {
+                firstInvalidEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                firstInvalidEl.focus();
+            }
+        } else {
+            if (errBanner) errBanner.classList.add('d-none');
+        }
+
+        return allValid;
+    }
+
+
+    // ── Quick day slot fill presets ───────────────────────────────────────────
+    const QUICK_SLOT_HOURS = {
+        morning:   [6, 7, 8],       // 6 AM – 9 AM
+        afternoon: [14, 15, 16],    // 2 PM – 5 PM
+        evening:   [18, 19, 20],    // 6 PM – 9 PM
+    };
+
+    function quickFillDay(preset) {
+        const hours = QUICK_SLOT_HOURS[preset];
+        if (!hours) return;
+        const starts = new Set(hours.map(h => h.toString().padStart(2, "0") + ":00"));
+        allUserSlots = allUserSlots.filter(slot => {
+            const day = slot.day_of_week || slot.day;
+            if (day !== currentSelectedDay) return true;
+            return !starts.has(slot.start_time);
+        });
+        updateAllViews();
+        const hf = document.getElementById("free-slots-json");
+        if (hf) hf.value = JSON.stringify(serializeSlotsToGrid());
+    }
+
+    function clearDaySlots() {
+        allUserSlots = allUserSlots.filter(s => (s.day_of_week || s.day) !== currentSelectedDay);
+        updateAllViews();
+        const hf = document.getElementById("free-slots-json");
+        if (hf) hf.value = JSON.stringify(serializeSlotsToGrid());
+    }
+
+    function initSlotTabs() {
+        const container = document.getElementById("day-tabs-container");
+        if (!container) return;
+        container.innerHTML = "";
+        DAYS_GRID.forEach(day => {
+            const btn = document.createElement("button");
+            btn.type = "button";
+            btn.className = "btn btn-sm btn-outline-secondary px-3 py-2 fw-semibold";
+            btn.innerText = day.slice(0, 3);
+            btn.id = "tab-day-" + day;
+            btn.onclick = () => selectDayTab(day);
+            container.appendChild(btn);
+        });
+        selectDayTab(currentSelectedDay);
+    }
+
+    function selectDayTab(day) {
+        currentSelectedDay = day;
+        const dayLabel = document.getElementById("current-day-label");
+        if (dayLabel) dayLabel.innerText = day;
+        
+        DAYS_GRID.forEach(d => {
+            const btn = document.getElementById("tab-day-" + d);
+            if (btn) {
+                if (d === day) {
+                    btn.className = "btn btn-sm btn-primary px-3 py-2 fw-semibold";
+                } else {
+                    btn.className = "btn btn-sm btn-outline-secondary px-3 py-2 fw-semibold";
+                }
+            }
+        });
+        
+        renderActiveSlots();
+    }
+
+    function loadSlotsFromServer() {
+        fetch("/student/api/availability")
+            .then(res => res.json())
+            .then(data => {
+                if (data.status === "success") {
+                    allUserSlots = data.slots;
+                    if (allUserSlots.length === 0) {
+                        applyPresetTemplate("balanced", false);
+                    } else {
+                        updateAllViews();
+                    }
+                }
+            })
+            .catch(err => console.error("Error loading availability slots:", err));
+    }
+
+    function saveSlotsToServer() {
+        fetch("/student/api/availability", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(allUserSlots.map(s => ({
+                day_of_week: s.day_of_week,
+                start_time: s.start_time,
+                end_time: s.end_time,
+                slot_type: s.slot_type,
+                category: s.category || s.slot_type,
+                custom_label: s.custom_label || ''
+            })))
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.status !== "success") {
+                console.error("Failed to save slots:", data.message);
+            }
+        })
+        .catch(err => console.error("Error saving slots:", err));
+    }
+
+    function renderActiveSlots() {
+        const list = document.getElementById("day-slots-list");
+        if (!list) return;
+        list.innerHTML = "";
+        
+        const daySlots = allUserSlots.filter(s => s.day_of_week === currentSelectedDay);
+        daySlots.sort((a, b) => a.start_time.localeCompare(b.start_time));
+        
+        if (daySlots.length === 0) {
+            list.innerHTML = `<div class="text-muted text-center py-3">No slots configured for ${currentSelectedDay}.</div>`;
+            return;
+        }
+        
+        daySlots.forEach(slot => {
+            const item = document.createElement("div");
+            item.className = "list-group-item d-flex justify-content-between align-items-center py-2 px-0 bg-transparent text-dark border-light";
+
+            const cat = slot.category || slot.slot_type || "Other";
+            const { color, textColor } = getCategoryStyle(cat);
+            const label = cat === "Other" && slot.custom_label ? `Other: ${slot.custom_label}` : cat;
+
+            const startDisplay = formatTime12(slot.start_time);
+            const endDisplay = formatTime12(slot.end_time);
+            const slotIdentifier = slot.id ? slot.id : `'${slot.tempId}'`;
+
+            item.innerHTML = `
+                <div>
+                    <span class="badge me-2" style="background:${color};color:${textColor};">${label}</span>
+                    <span class="fw-semibold text-dark">${startDisplay} &ndash; ${endDisplay}</span>
+                </div>
+                <button type="button" class="btn btn-sm btn-outline-danger border-0 p-1 py-0" onclick="removeSlotById(${slotIdentifier})">
+                    <i class="fas fa-trash"></i>
+                </button>
+            `;
+            list.appendChild(item);
+        });
+    }
+
+    function formatTime12(timeStr) {
+        const parts = timeStr.split(":");
+        let hour = parseInt(parts[0]);
+        const min = parts[1];
+        const ampm = hour >= 12 ? "PM" : "AM";
+        hour = hour % 12 === 0 ? 12 : hour % 12;
+        return `${hour}:${min} ${ampm}`;
+    }
+
+    // ── Category → colour mapping (WCAG AA >= 4.5:1 compliant) ───────────────
+    const CATEGORY_STYLES = {
+        'Sleep':            { color: '#8957e5', textColor: '#ffffff' },
+        'Class/Academic':   { color: '#2563eb', textColor: '#ffffff' },
+        'Sports':           { color: '#c2410c', textColor: '#ffffff' },
+        'Social/Hangout':   { color: '#be185d', textColor: '#ffffff' },
+        'Entertainment':    { color: '#dc2626', textColor: '#ffffff' },
+        'Personal/Chores':  { color: '#eab308', textColor: '#422006' },
+        'Other':            { color: '#64748b', textColor: '#ffffff' },
+        'Busy':             { color: '#64748b', textColor: '#ffffff' }, // legacy
+        'Study':            { color: '#059669', textColor: '#ffffff' }, // legacy
+    };
+    function getCategoryStyle(cat) {
+        return CATEGORY_STYLES[cat] || { color: '#94a3b8', textColor: '#1e293b' };
+    }
+    function getCategoryBlockClass(cat) {
+        const map = {
+            'Sleep': 'bg-sleep-block', 'Class/Academic': 'bg-class-block',
+            'Sports': 'bg-sports-block', 'Social/Hangout': 'bg-social-block',
+            'Entertainment': 'bg-entertainment-block', 'Personal/Chores': 'bg-chores-block',
+            'Other': 'bg-other-block', 'Busy': 'bg-other-block',
+            'Study': 'bg-study-block',
+        };
+        return map[cat] || 'bg-other-block';
+    }
+    function toggleCustomLabel(val, prefix) {
+        const row = document.getElementById(prefix + '-other-label-row');
+        if (!row) return;
+        row.style.setProperty('display', val === 'Other' ? 'flex' : 'none', 'important');
+    }
+
+    function getWeeklyMinuteRanges(slot) {
+        const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+        const dayIdx = days.indexOf(slot.day_of_week);
+        if (dayIdx === -1) return [];
+
+        const startParts = slot.start_time.split(":");
+        const endParts = slot.end_time.split(":");
+        const startMin = parseInt(startParts[0]) * 60 + parseInt(startParts[1]);
+        const endMin = parseInt(endParts[0]) * 60 + parseInt(endParts[1]);
+
+        const dayStartMin = dayIdx * 1440;
+
+        if (startMin < endMin) {
+            // Normal slot
+            return [{
+                start: dayStartMin + startMin,
+                end: dayStartMin + endMin
+            }];
+        } else {
+            // Overnight slot
+            const nextDayStartMin = ((dayIdx + 1) % 7) * 1440;
+            return [
+                { start: dayStartMin + startMin, end: dayStartMin + 1440 },
+                { start: nextDayStartMin, end: nextDayStartMin + endMin }
+            ];
+        }
+    }
+
+    function slotsOverlap(slot1, slot2) {
+        const ranges1 = getWeeklyMinuteRanges(slot1);
+        const ranges2 = getWeeklyMinuteRanges(slot2);
+        for (const r1 of ranges1) {
+            for (const r2 of ranges2) {
+                if (r1.start < r2.end && r2.start < r1.end) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    function addNewSlot() {
+        const category = document.getElementById("new-slot-type").value;
+        const start = document.getElementById("new-slot-start").value;
+        const end = document.getElementById("new-slot-end").value;
+        const customLabelEl = document.getElementById("new-slot-custom-label");
+        const customLabel = (customLabelEl && category === 'Other') ? customLabelEl.value.trim() : '';
+
+        if (!start || !end) {
+            alert("Please enter both start and end times.");
+            return;
+        }
+        if (start === end) {
+            alert("Start time and end time cannot be exactly equal.");
+            return;
+        }
+
+        const newSlot = {
+            tempId: Date.now() + Math.random().toString(36).substr(2, 5),
+            day_of_week: currentSelectedDay,
+            start_time: start,
+            end_time: end,
+            slot_type: category === 'Sleep' ? 'Sleep' : 'Busy', // for scheduler compat
+            category: category,
+            custom_label: customLabel
+        };
+
+        const overlaps = allUserSlots.some(s => slotsOverlap(newSlot, s));
+        if (overlaps) {
+            alert("Error: This slot overlaps with an existing slot.");
+            return;
+        }
+
+        allUserSlots.push(newSlot);
+        saveSlotsToServer();
+        updateAllViews();
+        // Clear the custom label
+        if (customLabelEl) customLabelEl.value = '';
+    }
+
+    function removeSlotById(id) {
+        allUserSlots = allUserSlots.filter(s => s.id !== id && s.tempId !== id);
+        saveSlotsToServer();
+        updateAllViews();
+    }
+
+    function copyCurrentDayToAll() {
+        const currentSlots = allUserSlots.filter(s => s.day_of_week === currentSelectedDay);
+        if (currentSlots.length === 0) {
+            alert("No slots to copy! Add some slots first.");
+            return;
+        }
+        
+        allUserSlots = allUserSlots.filter(s => s.day_of_week === currentSelectedDay);
+        
+        const otherDays = DAYS_GRID.filter(d => d !== currentSelectedDay);
+        otherDays.forEach(day => {
+            currentSlots.forEach(s => {
+                allUserSlots.push({
+                    tempId: Date.now() + Math.random().toString(36).substr(2, 5),
+                    day_of_week: day,
+                    start_time: s.start_time,
+                    end_time: s.end_time,
+                    slot_type: s.slot_type,
+                    category: s.category || s.slot_type || "Other",
+                    custom_label: s.custom_label || ""
+                });
+            });
+        });
+        
+        saveSlotsToServer();
+        updateAllViews();
+        alert(`Copied slots from ${currentSelectedDay} to all other days successfully!`);
+    }
+
+    function applyPresetTemplate(preset, save = true) {
+        allUserSlots = [];
+        
+        const makeSlot = (prefix, day, start, end, category, label = "") => ({
+            tempId: `${prefix}-${day}-${start}`,
+            day_of_week: day,
+            start_time: start,
+            end_time: end,
+            slot_type: category === "Sleep" ? "Sleep" : "Busy",
+            category: category,
+            custom_label: label
+        });
+        const standardSleep = { start: "00:00", end: "06:00" };
+        const standardSleepLate = { start: "22:00", end: "23:59" };
+        
+        if (preset === "balanced") {
+            DAYS_GRID.forEach(day => {
+                allUserSlots.push(
+                    makeSlot("b1", day, standardSleep.start, standardSleep.end, "Sleep"),
+                    makeSlot("b2", day, "08:00", "17:00", "Class/Academic"),
+                    makeSlot("b3", day, standardSleepLate.start, standardSleepLate.end, "Sleep")
+                );
+            });
+        } else if (preset === "fulltime") {
+            DAYS_GRID.forEach(day => {
+                const isWeekend = (day === "Saturday" || day === "Sunday");
+                if (!isWeekend) {
+                    allUserSlots.push(
+                        makeSlot("f1", day, standardSleep.start, standardSleep.end, "Sleep"),
+                        makeSlot("f2", day, "08:00", "16:00", "Class/Academic"),
+                        makeSlot("f3", day, standardSleepLate.start, standardSleepLate.end, "Sleep")
+                    );
+                } else {
+                    allUserSlots.push(
+                        makeSlot("f1", day, standardSleep.start, standardSleep.end, "Sleep"),
+                        makeSlot("f2", day, "20:00", "23:59", "Other", "Weekend commitment")
+                    );
+                }
+            });
+        } else if (preset === "parttime") {
+            DAYS_GRID.forEach(day => {
+                const isWeekend = (day === "Saturday" || day === "Sunday");
+                if (!isWeekend) {
+                    allUserSlots.push(
+                        makeSlot("p1", day, standardSleep.start, standardSleep.end, "Sleep"),
+                        makeSlot("p2", day, "08:00", "17:00", "Other", "Work"),
+                        makeSlot("p3", day, standardSleepLate.start, standardSleepLate.end, "Sleep")
+                    );
+                } else {
+                    allUserSlots.push(
+                        makeSlot("p1", day, standardSleep.start, standardSleep.end, "Sleep"),
+                        makeSlot("p2", day, "14:00", "23:59", "Personal/Chores")
+                    );
+                }
+            });
+        }
+        
+        if (save) saveSlotsToServer();
+        updateAllViews();
+    }
+
+    function updateAllViews() {
+        renderActiveSlots();
+        renderTimelinePreviews();
+        calculateStudyHours();
+        renderCommitmentsSummary();
+    }
+
+    function renderCommitmentsSummary() {
+        const container = document.getElementById("weekly-commitments-summary-container");
+        if (!container) return;
+        container.innerHTML = "";
+        
+        const totals = {};
+        allUserSlots.forEach(s => {
+            const cat = s.category || s.slot_type || "Other";
+            const startParts = s.start_time.split(":");
+            const endParts = s.end_time.split(":");
+            const startMins = parseInt(startParts[0]) * 60 + parseInt(startParts[1]);
+            const endMins = parseInt(endParts[0]) * 60 + parseInt(endParts[1]);
+            let dur = 0;
+            if (startMins > endMins) {
+                dur = ((1440 - startMins) + endMins) / 60.0;
+            } else {
+                dur = (endMins - startMins) / 60.0;
+            }
+            totals[cat] = (totals[cat] || 0) + dur;
+        });
+        
+        const categories = ["Sleep", "Class/Academic", "Sports", "Social/Hangout", "Entertainment", "Personal/Chores", "Other"];
+        let hasCommitments = false;
+        
+        categories.forEach(cat => {
+            const hours = totals[cat] || 0;
+            if (hours > 0) {
+                hasCommitments = true;
+                const style = getCategoryStyle(cat);
+                const badge = document.createElement("span");
+                badge.className = "badge p-2 d-flex align-items-center gap-1 fs-7";
+                badge.style.background = style.color;
+                badge.style.color = style.textColor;
+                // Add icon
+                let icon = "fa-clock";
+                if (cat === "Sleep") icon = "fa-bed";
+                else if (cat === "Class/Academic") icon = "fa-university";
+                else if (cat === "Sports") icon = "fa-running";
+                else if (cat === "Social/Hangout") icon = "fa-users";
+                else if (cat === "Entertainment") icon = "fa-gamepad";
+                else if (cat === "Personal/Chores") icon = "fa-home";
+                
+                badge.innerHTML = `<i class="fas ${icon} me-1"></i> ${cat}: ${hours.toFixed(1)}h`;
+                container.appendChild(badge);
+            }
+        });
+        
+        if (!hasCommitments) {
+            container.innerHTML = `<span class="text-muted small">No commitments configured yet. Use the editor below to add slots.</span>`;
+        }
+    }
+
+    function renderTimelinePreviews() {
+        const tbody = document.getElementById("timeline-preview-body");
+        if (!tbody) return;
+        tbody.innerHTML = "";
+        
+        // Build 7x24 grid initialized with "free" (Available study time by default)
+        const grid = {};
+        DAYS_GRID.forEach(day => {
+            grid[day] = new Array(24).fill("free");
+        });
+        
+        // Sort slots: order is Sleep, then Busy, then Study
+        const sortedSlots = [...allUserSlots].sort((a, b) => {
+            const order = { "Sleep": 1, "Busy": 2, "Study": 3 };
+            return order[a.slot_type] - order[b.slot_type];
+        });
+        
+        sortedSlots.forEach(s => {
+            const day = s.day_of_week;
+            const cat = s.category || s.slot_type || "Other";
+            const startH = parseInt(s.start_time.split(":")[0]);
+            const endH = parseInt(s.end_time.split(":")[0]);
+            const endM = parseInt(s.end_time.split(":")[1]);
+            
+            const startMins = startH * 60 + parseInt(s.start_time.split(":")[1]);
+            const endMins = endH * 60 + endM;
+            
+            const dayIdx = DAYS_GRID.indexOf(day);
+            if (dayIdx === -1) return;
+            
+            if (startMins < endMins) {
+                // Normal slot: same day
+                let finalEndH = (endM === 0) ? endH - 1 : endH;
+                for (let h = startH; h <= finalEndH; h++) {
+                    if (h >= 0 && h < 24) {
+                        grid[day][h] = cat;
+                    }
+                }
+            } else {
+                // Overnight slot: spans day and next day
+                // Day 1: start_hour to 23
+                for (let h = startH; h < 24; h++) {
+                    grid[day][h] = cat;
+                }
+                // Day 2 (next day): 0 to end_hour (or end_hour - 1 if endM == 0)
+                const nextDay = DAYS_GRID[(dayIdx + 1) % 7];
+                let finalEndH = (endM === 0) ? endH - 1 : endH;
+                for (let h = 0; h <= finalEndH; h++) {
+                    if (h >= 0 && h < 24) {
+                        grid[nextDay][h] = cat;
+                    }
+                }
+            }
+        });
+        
+        DAYS_GRID.forEach(day => {
+            const tr = document.createElement("tr");
+            tr.className = "align-middle";
+            
+            const hours = grid[day];
+            
+            const dayLabelTd = document.createElement("td");
+            dayLabelTd.className = "fw-bold text-secondary small py-1";
+            dayLabelTd.style.width = "60px";
+            dayLabelTd.innerText = day.slice(0, 3);
+            tr.appendChild(dayLabelTd);
+            
+            const timelineTd = document.createElement("td");
+            timelineTd.className = "py-1";
+            
+            const container = document.createElement("div");
+            container.className = "timeline-container";
+            
+            for (let h = 0; h < 24; h++) {
+                const block = document.createElement("div");
+                const cat = hours[h];
+                
+                let blockClass = "bg-study-block";
+                let typeLabel = "Available Study Time";
+                
+                if (cat !== "free") {
+                    blockClass = getCategoryBlockClass(cat);
+                    typeLabel = cat;
+                }
+                
+                block.className = `timeline-hour-block ${blockClass}`;
+                const h12 = h % 12 === 0 ? 12 : h % 12;
+                const ampm = h >= 12 ? "PM" : "AM";
+                block.title = `${day}, ${h12} ${ampm}: ${typeLabel}`;
+                container.appendChild(block);
+            }
+            
+            timelineTd.appendChild(container);
+            tr.appendChild(timelineTd);
+            tbody.appendChild(tr);
+        });
+    }
+
+    function calculateStudyHours() {
+        let commitmentHours = 0;
+        allUserSlots.forEach(slot => {
+            const startParts = slot.start_time.split(":");
+            const endParts = slot.end_time.split(":");
+            const startMins = parseInt(startParts[0]) * 60 + parseInt(startParts[1]);
+            const endMins = parseInt(endParts[0]) * 60 + parseInt(endParts[1]);
+            if (startMins > endMins) {
+                // wraps past midnight
+                commitmentHours += ((1440 - startMins) + endMins) / 60.0;
+            } else {
+                commitmentHours += (endMins - startMins) / 60.0;
+            }
+        });
+        const totalHours = Math.max(0, 168.0 - commitmentHours);
+        
+        const badge = document.getElementById("total-study-hours-badge");
+        if (badge) badge.innerText = `${totalHours.toFixed(1)} hrs/week`;
+        
+        const targetInput = document.querySelector('input[name="weekly_study_hours"], input[name="study_hours"]');
+        let targetHours = 20.0;
+        if (targetInput && targetInput.value) {
+            targetHours = parseFloat(targetInput.value) || 20.0;
+        }
+        
+        const warningAlert = document.getElementById("availability-warning-alert");
+        if (warningAlert) {
+            if (totalHours < targetHours) {
+                warningAlert.classList.remove("d-none");
+                document.getElementById("warn-avail-hours").innerText = totalHours.toFixed(1);
+                document.getElementById("warn-target-hours").innerText = targetHours.toFixed(1);
+            } else {
+                warningAlert.classList.add("d-none");
+            }
+        }
+        
+        const prevHours = document.getElementById("prev-hours");
+        if (prevHours) {
+            prevHours.innerText = (totalHours / 7.0).toFixed(1);
+        }
+    }
+
+    function serializeSlotsToGrid() {
+        let grid = {};
+        DAYS_GRID.forEach(day => {
+            for (let h = 0; h < 24; h++) {
+                grid[`${day}-${h}`] = 'free';
+            }
+        });
+        
+        const sortedSlots = [...allUserSlots].sort((a, b) => {
+            const order = { 'Sleep': 1, 'Busy': 2, 'Study': 3 };
+            return order[a.slot_type] - order[b.slot_type];
+        });
+        
+        sortedSlots.forEach(s => {
+            const day = s.day || s.day_of_week;
+            const startH = parseInt(s.start_time.split(":")[0]);
+            const endH = parseInt(s.end_time.split(":")[0]);
+            const endM = parseInt(s.end_time.split(":")[1]);
+            
+            const startMins = startH * 60 + parseInt(s.start_time.split(":")[1]);
+            const endMins = endH * 60 + endM;
+            
+            const dayIdx = DAYS_GRID.indexOf(day);
+            if (dayIdx === -1) return;
+            
+            let state = 'busy';
+            if (s.category === 'Sleep' || s.slot_type === 'Sleep') state = 'sleep';
+            
+            if (startMins < endMins) {
+                // Normal slot
+                let finalEndH = (endM === 0) ? endH - 1 : endH;
+                for (let h = startH; h <= finalEndH; h++) {
+                    if (h >= 0 && h < 24) {
+                        grid[`${day}-${h}`] = state;
+                    }
+                }
+            } else {
+                // Overnight slot
+                for (let h = startH; h < 24; h++) {
+                    grid[`${day}-${h}`] = state;
+                }
+                const nextDay = DAYS_GRID[(dayIdx + 1) % 7];
+                let finalEndH = (endM === 0) ? endH - 1 : endH;
+                for (let h = 0; h <= finalEndH; h++) {
+                    if (h >= 0 && h < 24) {
+                        grid[`${nextDay}-${h}`] = state;
+                    }
+                }
+            }
+        });
+        
+        return grid;
+    }
+
+    function runRiskAnalysis() {
+        if (!validateAllSubjectRows()) {
+            return;
+        }
+
+        const rows = document.querySelectorAll('#subjects-container .subject-row');
+        const subjects = [];
+        
+        const errBanner = document.getElementById('subject-validation-error');
+        const errMsg   = document.getElementById('subject-validation-msg');
+        if (errBanner) errBanner.classList.add('d-none');
+        
+        rows.forEach((row) => {
+            const nameInput = row.querySelector('[name="subject_name[]"]');
+            const gradeInput = row.querySelector('input[name="previous_grade[]"]');
+            const attInput = row.querySelector('input[name="attendance[]"]');
+            const hoursInput = row.querySelector('input[name="study_hours[]"]');
+            const examDaysInput = row.querySelector('input[name="days_until_exam[]"]');
+            const diffSelect = row.querySelector('[name="difficulty[]"]');
+            
+            if (!nameInput || !gradeInput || !attInput || !hoursInput || !diffSelect) return;
+            
+            const name = nameInput.value.trim();
+            const gradeVal = parseFloat(gradeInput.value.trim());
+            const attVal = parseFloat(attInput.value.trim());
+            const hoursVal = parseFloat(hoursInput.value.trim());
+            const examDaysVal = examDaysInput ? parseInt(examDaysInput.value.trim(), 10) : 30;
+            const diff = parseFloat(diffSelect.value);
+            
+            subjects.push({
+                name: name,
+                previous_grade: gradeVal,
+                attendance: attVal,
+                study_hours: hoursVal,
+                days_until_exam: examDaysVal,
+                difficulty: diff
+            });
+        });
+        
+        if (subjects.length === 0) {
+            if (errBanner && errMsg) {
+                errMsg.textContent = "⚠ Please enter at least one active subject first.";
+                errBanner.classList.remove('d-none');
+                errBanner.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+            return;
+        }
+        
+        fetch("/student/api/risk-analysis", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ subjects: subjects })
+        })
+        .then(res => {
+            return res.json().then(data => {
+                if (!res.ok || data.status !== "success") {
+                    throw new Error(data.message || "Error running analysis");
+                }
+                return data;
+            });
+        })
+        .then(data => {
+            if (data.status === "success") {
+                const tbody = document.getElementById("risk-analysis-table-body");
+                tbody.innerHTML = "";
+                
+                data.analysis.forEach(item => {
+                    let badgeStyle = "background:#dcfce7; color:#14532d; border:1px solid #86efac; font-weight:700;";
+                    if (item.risk_level === "High") {
+                        badgeStyle = "background:#fee2e2; color:#991b1b; border:1px solid #fca5a5; font-weight:700;";
+                    } else if (item.risk_level === "Medium") {
+                        badgeStyle = "background:#fef3c7; color:#7c2d12; border:1px solid #fde68a; font-weight:700;";
+                    }
+                    
+                    const riskLabel = item.risk_pct
+                        ? `${item.risk_level} Risk (${item.risk_pct}%)`
+                        : `${item.risk_level} Risk`;
+                    
+                    const tr = document.createElement("tr");
+                    tr.innerHTML = `
+                        <td class="fw-semibold text-dark">${item.name}</td>
+                        <td class="text-center"><span class="badge px-3 py-2" style="${badgeStyle}">${riskLabel}</span></td>
+                        <td class="text-center fw-bold text-dark">${item.allocated_hours} hrs/week</td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+                
+                document.getElementById("dashboard-total-hours").innerText = `${data.total_allocated_hours} hrs/week`;
+                document.getElementById("dashboard-available-hours").innerText = `${data.available_hours} hrs/week`;
+                
+                const warningBanner = document.getElementById("dashboard-warning-banner");
+                if (data.warning) {
+                    warningBanner.className = "alert alert-warning mb-3 border-0 shadow-sm d-block";
+                    warningBanner.style.background = "#fffbeb";
+                    warningBanner.style.color = "#b45309";
+                    warningBanner.innerHTML = `<i class="fas fa-exclamation-triangle me-2"></i> ${data.warning}`;
+                } else {
+                    warningBanner.className = "alert alert-success mb-3 border-0 shadow-sm d-block text-success";
+                    warningBanner.style.background = "#f0fdf4";
+                    warningBanner.innerHTML = `<i class="fas fa-check-circle me-2"></i> ML validation succeeded. Recommended study hours fit within your available study slots.`;
+                }
+                
+                document.getElementById("risk-analysis-dashboard").classList.remove("d-none");
+                document.getElementById("generate-button-container").classList.remove("d-none");
+                
+                document.getElementById("risk-analysis-dashboard").scrollIntoView({ behavior: 'smooth' });
+            }
+        })
+        .catch(err => {
+            console.error("Error analyzing risk:", err);
+            if (errBanner && errMsg) {
+                errMsg.textContent = err.message || "Error connecting to server to run risk analysis.";
+                errBanner.classList.remove('d-none');
+                errBanner.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            } else {
+                alert(err.message || "Error connecting to server to run risk analysis.");
+            }
+        });
+    }
+
+</script>
+</div>
+{% endblock %}
+

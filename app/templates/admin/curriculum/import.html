@@ -1,0 +1,148 @@
+{% extends 'admin/admin_base.html' %}
+{% block title %}Document Ingestion — Curriculum Management{% endblock %}
+
+{% block breadcrumb_items %}
+    <a href="{{ url_for('admin.curriculum_levels') }}">Curriculum</a>
+    <span class="sep"><i class="fas fa-chevron-right"></i></span>
+    <span class="active-item">Document Ingestion</span>
+{% endblock %}
+
+{% block admin_content %}
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+    <div>
+        <h1 class="h3 fw-bold text-white mb-1"><i class="fas fa-file-import me-2 text-primary"></i> Smart Document Ingestion</h1>
+        <p class="text-muted small mb-0">Upload syllabus files (DOCX, PDF, PPTX) to extract subjects, deduplicate global records, and commit mapping.</p>
+    </div>
+    <div class="d-flex gap-2">
+        <a href="{{ url_for('admin.unmapped_subjects') }}" class="btn btn-admin btn-admin-secondary btn-admin-sm">
+            <i class="fas fa-filter text-warning me-1"></i> View Unmapped Subjects
+        </a>
+    </div>
+</div>
+
+<div class="row g-3 mb-4">
+    <!-- Upload Card -->
+    <div class="col-lg-5">
+        <div class="admin-card h-100 mb-0">
+            <div class="admin-card-header">
+                <h2 class="admin-card-title"><i class="fas fa-cloud-arrow-up text-primary"></i> Upload Syllabus File</h2>
+            </div>
+            <form method="POST" action="{{ url_for('admin.curriculum_import_upload') }}" enctype="multipart/form-data">
+                <div class="mb-3">
+                    <label class="form-label text-muted small fw-semibold">Select Syllabus Document</label>
+                    <input type="file" name="syllabus_file" class="form-control admin-form-control" accept=".docx,.pdf,.pptx" required>
+                    <div class="form-text text-dim small mt-1">Supported: DOCX, PDF, PPTX (Max size: 20MB). Safe staging session created automatically.</div>
+                </div>
+
+                <div class="p-3 rounded mb-3" style="background: rgba(59, 130, 246, 0.12); border: 1px solid var(--admin-info); font-size: 0.85rem;">
+                    <i class="fas fa-shield-halved text-info me-1"></i>
+                    <strong>Safe Staging Workflow:</strong> Upload → Safe Text Extract → Deduplication Match → Admin Preview Review → Transactional Commit.
+                </div>
+
+                <button type="submit" class="btn btn-admin btn-admin-primary w-100 justify-content-center">
+                    <i class="fas fa-arrow-right me-1"></i> Process Upload & Extract
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- How Ingestion Works Card -->
+    <div class="col-lg-7">
+        <div class="admin-card h-100 mb-0">
+            <div class="admin-card-header">
+                <h2 class="admin-card-title"><i class="fas fa-diagram-project text-warning"></i> Ingestion Safety & Architecture</h2>
+            </div>
+            <div class="row g-2">
+                <div class="col-md-6">
+                    <div class="p-3 rounded" style="background: rgba(255,255,255,0.02); border: 1px solid var(--admin-border);">
+                        <span class="badge bg-primary-subtle text-primary border border-primary-subtle px-2 py-0.5 mb-1.5 font-semibold">1. Extraction</span>
+                        <div class="fw-bold text-white small">Multi-Format Parser</div>
+                        <div class="text-muted small mt-1" style="font-size: 0.78rem;">Extracts text, headings, and tables from DOCX, PDF (PyMuPDF), and PPTX without database side-effects.</div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="p-3 rounded" style="background: rgba(255,255,255,0.02); border: 1px solid var(--admin-border);">
+                        <span class="badge bg-info-subtle text-info border border-info-subtle px-2 py-0.5 mb-1.5 font-semibold">2. Deduplication</span>
+                        <div class="fw-bold text-white small">Global Subject Matcher</div>
+                        <div class="text-muted small mt-1" style="font-size: 0.78rem;">Calculates match confidence scores (0.0-1.0) against existing global subject codes and names.</div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="p-3 rounded" style="background: rgba(255,255,255,0.02); border: 1px solid var(--admin-border);">
+                        <span class="badge bg-warning-subtle text-warning border border-warning-subtle px-2 py-0.5 mb-1.5 font-semibold">3. Admin Review</span>
+                        <div class="fw-bold text-white small">Interactive Preview</div>
+                        <div class="text-muted small mt-1" style="font-size: 0.78rem;">Allows admin to set LINK_EXISTING, CREATE_NEW, or SKIP action on each extracted subject row.</div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="p-3 rounded" style="background: rgba(255,255,255,0.02); border: 1px solid var(--admin-border);">
+                        <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-0.5 mb-1.5 font-semibold">4. Atomic Commit</span>
+                        <div class="fw-bold text-white small">Transactional Ingestion</div>
+                        <div class="text-muted small mt-1" style="font-size: 0.78rem;">Writes mappings into ProgramSubject table atomically with full rollback if an error occurs.</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Sessions Table -->
+<div class="admin-card p-0">
+    <div class="admin-card-header px-4 py-3 mb-0">
+        <h2 class="admin-card-title fs-6"><i class="fas fa-history text-muted"></i> Ingestion Session History ({{ sessions|length }})</h2>
+    </div>
+
+    {% if sessions %}
+    <div class="admin-table-container border-0">
+        <table class="admin-table">
+            <thead>
+                <tr>
+                    <th class="ps-4">Source File</th>
+                    <th>Document Format</th>
+                    <th>Detected Program</th>
+                    <th>Ingestion Status</th>
+                    <th>Uploaded Date</th>
+                    <th class="pe-4 text-end">Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for s in sessions %}
+                <tr>
+                    <td class="ps-4 fw-bold text-white">{{ s.source_file }}</td>
+                    <td>
+                        <span class="badge bg-secondary-subtle text-white border border-secondary px-2 py-1 font-mono uppercase">{{ s.doc_type }}</span>
+                    </td>
+                    <td class="small text-muted">{{ s.detected_program or 'Unspecified' }}</td>
+                    <td>
+                        {% if s.status == 'committed' %}
+                        <span class="badge-status active"><i class="fas fa-check-circle"></i> Committed</span>
+                        {% elif s.status in ['extracted', 'reviewing', 'pending'] %}
+                        <span class="badge-status warning"><i class="fas fa-clock"></i> Ready for Review</span>
+                        {% elif s.status == 'cancelled' %}
+                        <span class="badge-status info"><i class="fas fa-ban"></i> Cancelled</span>
+                        {% else %}
+                        <span class="badge-status error"><i class="fas fa-circle-exclamation"></i> {{ s.status }}</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-muted small">{{ s.created_at.strftime('%b %d, %Y %H:%M') }}</td>
+                    <td class="pe-4 text-end">
+                        {% if s.status in ['extracted', 'reviewing', 'pending'] %}
+                        <a href="{{ url_for('admin.curriculum_import_preview', session_id=s.id) }}" class="btn btn-admin btn-admin-primary btn-admin-sm">
+                            <i class="fas fa-eye me-1"></i> Review Session
+                        </a>
+                        {% else %}
+                        <a href="{{ url_for('admin.curriculum_import_preview', session_id=s.id) }}" class="btn btn-admin btn-admin-secondary btn-admin-sm">
+                            <i class="fas fa-search me-1"></i> View Log
+                        </a>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="p-4 text-center text-muted small">No document ingestion sessions logged yet.</div>
+    {% endif %}
+</div>
+{% endblock %}

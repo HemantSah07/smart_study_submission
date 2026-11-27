@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+
+{% block title %}Verify Admin Registration - Smart Study{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6 col-lg-5">
+            <div class="card shadow-lg border-0 rounded-4 p-4 p-md-5">
+                <div class="text-center mb-4">
+                    <div class="d-inline-flex align-items-center justify-content-center bg-primary bg-opacity-10 text-primary rounded-circle mb-3" style="width: 70px; height: 70px;">
+                        <i class="bi bi-shield-check display-5"></i>
+                    </div>
+                    <h3 class="fw-bold text-dark mb-1">Verify Admin Code</h3>
+                    <p class="text-muted small">Enter your approved single-use verification code sent to your email.</p>
+                </div>
+
+                <form method="POST" action="{{ url_for('auth.verify_admin_code') }}">
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Personal Email Address</label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-light border-end-0"><i class="bi bi-envelope"></i></span>
+                            <input type="email" name="email" class="form-control bg-light border-start-0" value="{{ email or '' }}" placeholder="your.email@example.com" required>
+                        </div>
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="form-label fw-semibold">6-Digit Verification Code</label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-light border-end-0"><i class="bi bi-key-fill text-primary"></i></span>
+                            <input type="text" name="verification_code" class="form-control bg-light border-start-0 font-monospace fs-4 text-center tracking-widest" placeholder="123456" maxlength="10" required autofocus>
+                        </div>
+                        <div class="form-text text-muted small mt-2">
+                            <i class="bi bi-info-circle me-1"></i>Codes are issued upon approval by the Primary Super Admin and expire after 24 hours.
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary w-100 py-3 fw-bold rounded-3 shadow-sm mb-3">
+                        <i class="bi bi-check-circle me-2"></i>Verify & Activate Admin Account
+                    </button>
+
+                    <div class="text-center">
+                        <a href="{{ url_for('auth.login') }}" class="text-decoration-none text-muted small">
+                            <i class="bi bi-arrow-left me-1"></i>Back to Login
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

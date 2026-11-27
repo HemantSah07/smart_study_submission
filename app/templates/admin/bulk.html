@@ -1,0 +1,137 @@
+{% extends 'base.html' %}
+{% block title %}Bulk Operations — Admin{% endblock %}
+
+{% block content %}
+<div class="hero-banner mb-4">
+    <h1 class="page-title mb-2"><i class="fas fa-layer-group me-2 text-gradient"></i> Bulk Operations</h1>
+    <p class="page-subtitle mb-0">Run batch processes across the system, trigger global ML predictions, or send targeted communications.</p>
+</div>
+
+<div class="row g-4">
+    <!-- Batch ML Re-run -->
+    <div class="col-lg-6">
+        <div class="card card-flat p-4 h-100">
+            <h6 class="fw-bold text-gradient mb-3"><i class="fas fa-robot me-2"></i> Batch ML Risk Prediction</h6>
+            <p class="text-muted small">Runs risk predictions for all registered students who have completed profiles and configured subjects. This updates predictions in the database and recalculates cohort statistics.</p>
+            
+            <div class="alert alert-info bg-dark border-info text-info small d-flex align-items-center gap-2 mt-auto">
+                <i class="fas fa-info-circle"></i>
+                <span>This process scales with student size. May take up to a minute on large cohorts.</span>
+            </div>
+            
+            <form action="{{ url_for('admin.bulk') }}" method="POST" class="mt-3">
+                <input type="hidden" name="action" value="batch_ml">
+                <button type="submit" class="btn btn-primary w-100 py-2 fw-semibold" onclick="return confirm('Start batch ML prediction for all students?')">
+                    <i class="fas fa-play me-1"></i> Trigger Batch ML Run
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Targeted Group Notifications -->
+    <div class="col-lg-6">
+        <div class="card card-flat p-4 h-100">
+            <h6 class="fw-bold text-gradient mb-3"><i class="fas fa-bullhorn me-2"></i> Bulk Student Notifications</h6>
+            <p class="text-muted small">Deliver system alerts or critical instructions to students' inboxes based on their cohort or academic risk category.</p>
+            
+            <form action="{{ url_for('admin.bulk') }}" method="POST" class="mt-3">
+                <input type="hidden" name="action" value="bulk_notification">
+                
+                <div class="mb-3">
+                    <label for="target" class="form-label text-muted small">Target Audience</label>
+                    <select id="target" name="target" class="form-select bg-dark border-secondary text-white" onchange="toggleNotificationTargets()">
+                        <option value="all">All Students</option>
+                        <option value="cohort">By Cohort Level</option>
+                        <option value="risk">By Predicted Risk Level</option>
+                    </select>
+                </div>
+                
+                <!-- Cohort Level select (hidden by default) -->
+                <div id="cohort-select-container" class="mb-3 d-none">
+                    <label for="cohort" class="form-label text-muted small">Select Cohort Level</label>
+                    <select id="cohort" name="cohort" class="form-select bg-dark border-secondary text-white">
+                        {% for c in cohorts %}
+                        <option value="{{ c }}">{{ c }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <!-- Risk Level select (hidden by default) -->
+                <div id="risk-select-container" class="mb-3 d-none">
+                    <label for="risk_level" class="form-label text-muted small">Select Predicted Risk</label>
+                    <select id="risk_level" name="risk_level" class="form-select bg-dark border-secondary text-white">
+                        <option value="high">High Risk</option>
+                        <option value="medium">Medium Risk</option>
+                        <option value="low">Low Risk / Safe</option>
+                    </select>
+                </div>
+                
+                <div class="mb-3">
+                    <label for="message" class="form-label text-muted small">Message Content</label>
+                    <textarea id="message" name="message" rows="4" class="form-control bg-dark border-secondary text-white" placeholder="Type notification message here..." required></textarea>
+                </div>
+                
+                <button type="submit" class="btn btn-warning w-100 py-2 fw-semibold text-dark">
+                    <i class="fas fa-paper-plane me-1"></i> Send Bulk Notification
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Section 8: Database & Curriculum Bulk Operations -->
+<div class="row g-4 mt-2 mb-5">
+    <!-- Curriculum Import & MCQ Bulk-Seeding -->
+    <div class="col-lg-6">
+        <div class="card card-flat p-4 h-100">
+            <h6 class="fw-bold text-gradient mb-3"><i class="fas fa-database me-2"></i> Curriculum & Question Bank Seeding</h6>
+            <p class="text-muted small">Import class structures and subjects using a CSV spreadsheet, or queue multiple subjects for automated MCQ generation in a rate-limit safe execution queue.</p>
+            
+            <div class="d-flex gap-3 mt-auto">
+                <a href="{{ url_for('admin.bulk_import_curriculum') }}" class="btn btn-outline-primary flex-grow-1 py-2 fw-semibold">
+                    <i class="fas fa-file-import me-1"></i> Import Curriculum CSV
+                </a>
+                <a href="{{ url_for('admin.bulk_seed_questions') }}" class="btn btn-primary flex-grow-1 py-2 fw-semibold">
+                    <i class="fas fa-seedling me-1"></i> Queue MCQ Seeding
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Student Data Backup & Exports -->
+    <div class="col-lg-6">
+        <div class="card card-flat p-4 h-100">
+            <h6 class="fw-bold text-gradient mb-3"><i class="fas fa-download me-2"></i> Student Data Backups</h6>
+            <p class="text-muted small">Export all student accounts, profiles, cumulative GPAs, study planner records, and assessment counts for backup, analytics, or external reporting purposes.</p>
+            
+            <div class="d-flex gap-3 mt-auto">
+                <a href="{{ url_for('admin.bulk_export_students_json') }}" class="btn btn-outline-secondary flex-grow-1 py-2 fw-semibold" download>
+                    <i class="fas fa-file-code me-1"></i> Export Student JSON
+                </a>
+                <a href="{{ url_for('admin.bulk_export_students') }}" class="btn btn-primary flex-grow-1 py-2 fw-semibold" download>
+                    <i class="fas fa-file-csv me-1"></i> Export Student CSV
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function toggleNotificationTargets() {
+    var target = document.getElementById("target").value;
+    var cohortContainer = document.getElementById("cohort-select-container");
+    var riskContainer = document.getElementById("risk-select-container");
+    
+    if (target === "cohort") {
+        cohortContainer.classList.remove("d-none");
+        riskContainer.classList.add("d-none");
+    } else if (target === "risk") {
+        cohortContainer.classList.add("d-none");
+        riskContainer.classList.remove("d-none");
+    } else {
+        cohortContainer.classList.add("d-none");
+        riskContainer.classList.add("d-none");
+    }
+}
+</script>
+{% endblock %}

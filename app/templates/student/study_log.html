@@ -1,0 +1,202 @@
+{% extends 'base.html' %}
+{% block title %}Study Log · Learning Journey{% endblock %}
+
+{% block breadcrumbs %}
+<span class="sep"><i class="fas fa-chevron-right"></i></span>
+<span>Progress</span>
+<span class="sep"><i class="fas fa-chevron-right"></i></span>
+<span class="current">Study Log</span>
+{% endblock %}
+
+{% block content %}
+<div class="ss-page px-2 py-3">
+<!-- ── Learning Journey Hero ── -->
+<section class="ss-page-hero position-relative overflow-hidden mb-4">
+    <div class="ss-page-hero-bg" style="background-image: url('{{ url_for('static', filename='img/ui/student/journey.webp') }}');"></div>
+    <div class="ss-page-hero-content py-3">
+        <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
+            <div>
+                <div class="ss-badge ss-badge-amber mb-2">
+                    <i class="fas fa-stream me-1"></i> Learning Journey Log
+                </div>
+                <h1 class="display-6 fw-bold text-white mb-1" style="letter-spacing: -0.02em;">
+                    Study Log &amp; Session History
+                </h1>
+                <p class="text-muted mb-0" style="font-size: 1.05rem;">
+                    Log study sessions, track daily study consistency, and build long-term academic discipline.
+                </p>
+            </div>
+            <div>
+                <div class="ss-stat-icon p-0 px-3 py-2 text-white fw-bold d-flex align-items-center gap-2" style="background:rgba(251,191,36,0.2);border:1px solid rgba(251,191,36,0.3);border-radius:12px;">
+                    <i class="fas fa-hourglass-half text-amber"></i> Total Logged: {{ "%.1f"|format(total_logged) }}h
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+
+{# ── Stats computed from logs via Jinja ─────────────────────────────────── #}
+{% set today_total = namespace(val=0.0) %}
+{% set week_total  = namespace(val=0.0) %}
+{% set month_total = namespace(val=0.0) %}
+{% set today_str   = none %}
+{% if logs %}
+    {# Use first log's date module via Python — we compute via the template sort instead #}
+    {# We'll show the stats that we CAN derive cleanly #}
+    {% set sorted_logs = logs | sort(attribute='date', reverse=true) %}
+    {% set newest_date = sorted_logs[0].date.strftime('%Y-%m-%d') if sorted_logs else '' %}
+    {% for log in sorted_logs %}
+        {% set log_str = log.date.strftime('%Y-%m-%d') %}
+        {% if loop.first %}{% set today_str = log_str %}{% endif %}
+        {% if log_str == newest_date %}
+            {% set today_total.val = today_total.val + log.duration_hours %}
+        {% endif %}
+    {% endfor %}
+{% endif %}
+
+<div class="row g-3 mb-4 stagger-2">
+    <div class="col-6 col-md-3">
+        <div class="ss-stat-mini">
+            <div class="ss-mini-val text-gradient">{{ "%.1f"|format(today_total.val) }}h</div>
+            <div class="ss-mini-label">Last Day Active</div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="ss-stat-mini">
+            <div class="ss-mini-val text-gradient">{{ logs | length }}</div>
+            <div class="ss-mini-label">Total Sessions</div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="ss-stat-mini">
+            <div class="ss-mini-val text-gradient">{{ "%.1f"|format(total_logged) }}h</div>
+            <div class="ss-mini-label">Total Hours</div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="ss-stat-mini">
+            {% if logs %}
+            <div class="ss-mini-val text-gradient">{{ "%.1f"|format(total_logged / logs|length) }}h</div>
+            {% else %}
+            <div class="ss-mini-val text-gradient">—</div>
+            {% endif %}
+            <div class="ss-mini-label">Avg Per Session</div>
+        </div>
+    </div>
+</div>
+
+{# ── Insight callout ─────────────────────────────────────────────────────── #}
+{% if total_logged > 0 %}
+<div class="ss-insight mb-4 stagger-2">
+    <i class="fas fa-lightbulb"></i>
+    <span>
+        {% if total_logged >= 50 %}
+            You've logged <strong>{{ "%.1f"|format(total_logged) }} hours</strong> of focused study time. That's remarkable dedication — keep going! 🏆
+        {% elif total_logged >= 20 %}
+            You've logged <strong>{{ "%.1f"|format(total_logged) }} hours</strong> of study. You're building great academic habits.
+        {% elif total_logged >= 5 %}
+            You've logged <strong>{{ "%.1f"|format(total_logged) }} hours</strong> so far. Small steps create big results — one session at a time.
+        {% else %}
+            You're starting your study journey. Every session you log helps you understand your habits better.
+        {% endif %}
+    </span>
+</div>
+{% endif %}
+
+<div class="row g-4 stagger-3">
+    {# ── Log New Session Form ──────────────────────────────────────────── #}
+    <div class="col-lg-4">
+        <div class="card card-flat p-4">
+            <h5 class="text-gradient fw-bold mb-4"><i class="fas fa-plus-circle me-2"></i> Log a Session</h5>
+            <form method="POST">
+                <div class="mb-3">
+                    <label class="form-label" for="duration_hours">Duration (hours)</label>
+                    <input type="number" step="0.1" name="duration_hours" id="duration_hours"
+                           class="form-control" required min="0.1" max="12" placeholder="e.g. 2.5">
+                    <div class="form-text">Between 0.1 and 12 hours per session.</div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label" for="subject_id">Subject</label>
+                    <select name="subject_id" id="subject_id" class="form-select">
+                        <option value="">General Study (No Specific Subject)</option>
+                        {% for s in subjects %}
+                        <option value="{{ s.id }}">{{ s.name }} ({{ s.code }})</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="mb-4">
+                    <label class="form-label" for="notes">What did you study?</label>
+                    <textarea name="notes" id="notes" class="form-control" rows="3"
+                              placeholder="Topics, chapters, practice problems…"></textarea>
+                </div>
+                <button type="submit" class="btn btn-primary w-100 py-3">
+                    <i class="fas fa-check me-2"></i> Log Session
+                </button>
+            </form>
+            <div class="mt-4 pt-3" style="border-top:1px solid var(--border);">
+                <p class="text-muted small mb-0">
+                    <i class="fas fa-info-circle me-1 text-primary"></i>
+                    <em>One focused session at a time. You're building consistency.</em>
+                </p>
+            </div>
+        </div>
+    </div>
+
+    {# ── Session History Timeline ──────────────────────────────────────── #}
+    <div class="col-lg-8">
+        <div class="card card-flat p-4">
+            <h5 class="text-gradient fw-bold mb-4"><i class="fas fa-list me-2"></i> Session History</h5>
+
+            {% if logs %}
+            {# Group by date — track previous date label to print headings #}
+            {% set prev_date = namespace(val='') %}
+            {% set open_group = namespace(val=false) %}
+
+            {% for log in logs %}
+                {% set log_date_str = log.date.strftime('%Y-%m-%d') %}
+
+                {% if log_date_str != prev_date.val %}
+                    {% if open_group.val %}</div>{% endif %}
+                    {% set open_group.val = true %}
+                    {% set prev_date.val = log_date_str %}
+                    <div class="ss-log-date-group">
+                    <div class="ss-log-date-label">
+                        {{ log.date.strftime('%A, %d %B %Y') }}
+                    </div>
+                {% endif %}
+
+                <div class="ss-log-entry">
+                    <span class="ss-log-dot" style="background:{% if log.subject %}var(--purple){% else %}var(--blue){% endif %};"></span>
+                    <div class="flex-grow-1 min-w-0">
+                        <div class="d-flex align-items-center gap-2 flex-wrap">
+                            <span class="fw-bold text-gradient">{{ log.duration_hours }}h</span>
+                            {% if log.subject %}
+                            <span class="badge" style="background:rgba(168,85,247,0.15);color:var(--purple);border:1px solid rgba(168,85,247,0.3);font-size:0.7rem;">{{ log.subject.name }}</span>
+                            {% else %}
+                            <span class="badge" style="background:rgba(56,189,248,0.1);color:var(--blue);border:1px solid rgba(56,189,248,0.2);font-size:0.7rem;">General Study</span>
+                            {% endif %}
+                        </div>
+                        {% if log.notes %}
+                        <p class="text-muted small mt-1 mb-0">{{ log.notes }}</p>
+                        {% endif %}
+                    </div>
+                    <div class="text-muted" style="font-size:0.72rem;white-space:nowrap;flex-shrink:0;">
+                        {{ log.date.strftime('%d %b') }}
+                    </div>
+                </div>
+
+            {% endfor %}
+            {% if open_group.val %}</div>{% endif %}
+
+            {% else %}
+            <div class="ss-empty">
+                <div class="ss-empty-icon"><i class="fas fa-rocket"></i></div>
+                <h5>Your study journey starts here 🚀</h5>
+                <p>Log your first study session to begin tracking your progress and building a consistent study habit.</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

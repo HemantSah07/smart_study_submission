@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 400" fill="none">
+  <defs>
+    <linearGradient id="radar-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#22d3ee" stop-opacity="0.8"/>
+      <stop offset="100%" stop-color="#6366f1" stop-opacity="0.8"/>
+    </linearGradient>
+    <filter id="radar-glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="20" result="blur"/>
+    </filter>
+  </defs>
+
+  <circle cx="300" cy="200" r="130" fill="url(#radar-grad)" filter="url(#radar-glow)" opacity="0.3"/>
+  <circle cx="300" cy="200" r="140" stroke="#22d3ee" stroke-width="1.5" stroke-dasharray="4 6" opacity="0.4"/>
+  <circle cx="300" cy="200" r="100" stroke="#6366f1" stroke-width="1.5" opacity="0.5"/>
+  <circle cx="300" cy="200" r="60" stroke="#38bdf8" stroke-width="1.5" stroke-dasharray="2 4" opacity="0.6"/>
+
+  <line x1="300" y1="60" x2="300" y2="340" stroke="#ffffff" stroke-width="1" opacity="0.15"/>
+  <line x1="160" y1="200" x2="440" y2="200" stroke="#ffffff" stroke-width="1" opacity="0.15"/>
+
+  <!-- Radar Scan Sweep -->
+  <path d="M300 200 L420 120 A140 140 0 0 0 300 60 Z" fill="rgba(34,211,238,0.25)"/>
+
+  <!-- Blips -->
+  <circle cx="380" cy="140" r="6" fill="#f87171"/>
+  <circle cx="380" cy="140" r="12" stroke="#f87171" stroke-width="1.5" opacity="0.6"/>
+
+  <circle cx="230" cy="160" r="5" fill="#fbbf24"/>
+  <circle cx="340" cy="260" r="5" fill="#34d399"/>
+</svg>

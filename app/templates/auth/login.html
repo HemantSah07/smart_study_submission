@@ -1,0 +1,136 @@
+{% extends 'base.html' %}
+{% block title %}Login — Smart Study{% endblock %}
+
+{% block content %}
+<div class="ss-page my-3">
+    <div class="row g-0 align-items-stretch overflow-hidden rounded-4 border border-secondary shadow-lg" style="background: rgba(10, 15, 30, 0.85); backdrop-filter: blur(20px);">
+        {# Left Side: Cinematic Brand Visual #}
+        <div class="col-lg-6 position-relative d-none d-lg-flex flex-column justify-content-between p-5 overflow-hidden">
+            <div class="ss-page-hero-bg" style="background-image: url('{{ url_for('static', filename='img/ui/public/login-hero.webp') }}'); opacity: 0.85;"></div>
+            
+            <div class="position-relative z-2">
+                <a href="{{ url_for('main.home') }}">
+                    <img src="{{ url_for('static', filename='img/brand/smart-study-logo-light.svg') }}" alt="Smart Study Logo" style="height: 48px;">
+                </a>
+            </div>
+
+            <div class="position-relative z-2 my-auto py-5">
+                <div class="ss-badge ss-badge-purple mb-3">AI Intelligence Command</div>
+                <h2 class="display-6 fw-bold text-white mb-3" style="letter-spacing: -0.02em;">
+                    Your Neural Academic Operating System
+                </h2>
+                <p class="text-muted mb-4 lead" style="font-size: 1.05rem; line-height: 1.6;">
+                    ML-powered scheduling, Random Forest risk radar, and adaptive knowledge library — designed for students from Class 8 to Master level.
+                </p>
+                <div class="d-flex flex-column gap-2">
+                    <div class="d-flex align-items-center gap-3 text-white small fw-medium">
+                        <div class="ss-stat-icon p-0 m-0" style="width:28px;height:28px;font-size:0.8rem;"><i class="fas fa-check"></i></div>
+                        <span>Adaptive Weekly Focus Planner</span>
+                    </div>
+                    <div class="d-flex align-items-center gap-3 text-white small fw-medium">
+                        <div class="ss-stat-icon p-0 m-0" style="width:28px;height:28px;font-size:0.8rem;"><i class="fas fa-check"></i></div>
+                        <span>Academic Risk Intelligence Radar</span>
+                    </div>
+                    <div class="d-flex align-items-center gap-3 text-white small fw-medium">
+                        <div class="ss-stat-icon p-0 m-0" style="width:28px;height:28px;font-size:0.8rem;"><i class="fas fa-check"></i></div>
+                        <span>24/7 AI Study Coach Assistant</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="position-relative z-2 pt-3 border-top border-secondary text-muted small">
+                © 2026 Smart Study. All rights reserved.
+            </div>
+        </div>
+
+        {# Right Side: Authentication Panel #}
+        <div class="col-lg-6 p-4 p-md-5 d-flex flex-column justify-content-center">
+            <div class="text-center d-lg-none mb-4">
+                <img src="{{ url_for('static', filename='img/brand/smart-study-logo-light.svg') }}" alt="Smart Study Logo" style="height: 42px;">
+            </div>
+
+            <div class="mb-4 text-center text-lg-start">
+                <h3 class="fw-bold text-white mb-2">Welcome Back</h3>
+                <p class="text-muted small">Access your academic command center</p>
+            </div>
+
+            <form id="loginForm" method="POST">
+                <div class="mb-3">
+                    <label class="form-label text-white small fw-semibold">Email Address</label>
+                    <div class="input-group">
+                        <span class="input-group-text bg-dark border-secondary text-muted"><i class="fas fa-envelope"></i></span>
+                        <input type="email" id="email" name="email" class="form-control bg-dark border-secondary text-white py-2.5" placeholder="name@mail.apu.edu.my" required>
+                    </div>
+                    <div class="invalid-feedback" id="emailError">Enter a valid email.</div>
+                </div>
+
+                <div class="mb-4">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <label class="form-label text-white small fw-semibold mb-0">Password</label>
+                    </div>
+                    <div class="input-group">
+                        <span class="input-group-text bg-dark border-secondary text-muted"><i class="fas fa-key"></i></span>
+                        <input type="password" id="password" name="password" class="form-control bg-dark border-secondary text-white py-2.5" placeholder="Your password" required>
+                        <button class="btn btn-outline-secondary border-secondary text-white" type="button" id="togglePassword" aria-label="Toggle password">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                    </div>
+                    <div class="invalid-feedback" id="passwordError" style="display:none;"></div>
+                </div>
+
+                <button type="submit" id="submitBtn" class="btn btn-primary w-100 py-3 fw-bold rounded-3 shadow-lg" disabled>
+                    <span id="btnText">Sign In to Dashboard <i class="fas fa-arrow-right ms-2"></i></span>
+                    <span id="loadingSpinner" class="spinner-border spinner-border-sm d-none"></span>
+                </button>
+            </form>
+
+            <div class="text-center mt-4 pt-3 border-top border-secondary">
+                <p class="text-muted small mb-0">
+                    Don't have an account yet? 
+                    <a href="{{ url_for('auth.register') }}" class="text-gradient fw-bold text-decoration-none ms-1">Register Account</a>
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const email = document.getElementById('email');
+    const password = document.getElementById('password');
+    const submitBtn = document.getElementById('submitBtn');
+    const emailError = document.getElementById('emailError');
+    const passwordError = document.getElementById('passwordError');
+    const togglePassword = document.getElementById('togglePassword');
+
+    function validateEmail(v) { return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v); }
+
+    function checkForm() {
+        const okEmail = validateEmail(email.value);
+        const okPass = password.value.length >= 6;
+        submitBtn.disabled = !(okEmail && okPass);
+        if (email.value) email.classList.toggle('is-invalid', !okEmail);
+        if (password.value) {
+            password.classList.toggle('is-invalid', !okPass);
+            passwordError.style.display = okPass ? 'none' : 'block';
+            passwordError.textContent = 'Minimum 6 characters.';
+        }
+    }
+    email.addEventListener('input', checkForm);
+    password.addEventListener('input', checkForm);
+
+    togglePassword.addEventListener('click', () => {
+        const t = password.type === 'password' ? 'text' : 'password';
+        password.type = t;
+        togglePassword.querySelector('i').className = t === 'password' ? 'fas fa-eye' : 'fas fa-eye-slash';
+    });
+
+    document.getElementById('loginForm').addEventListener('submit', () => {
+        submitBtn.disabled = true;
+        document.getElementById('btnText').classList.add('d-none');
+        document.getElementById('loadingSpinner').classList.remove('d-none');
+    });
+});
+</script>
+{% endblock %}
+

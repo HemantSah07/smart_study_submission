@@ -1,0 +1,238 @@
+{% extends 'admin/admin_base.html' %}
+{% block title %}Global Admin Search — Admin Control Center{% endblock %}
+
+{% block breadcrumb_items %}
+    <span class="active-item">Global Search</span>
+{% endblock %}
+
+{% block admin_content %}
+<!-- Header Bar -->
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+    <div>
+        <h1 class="h3 fw-bold text-white mb-1"><i class="fas fa-search me-2 text-primary"></i> Global Admin Search Center</h1>
+        <p class="text-muted small mb-0">Search across Students, Programs, Subjects, Chapters, Topics, Learning Materials, Universities, and Faculties.</p>
+    </div>
+</div>
+
+<!-- Search Query Form Card -->
+<div class="admin-card p-3 mb-4">
+    <form action="{{ url_for('admin.search') }}" method="GET" class="row g-2 align-items-center">
+        <div class="col-12 col-md-8">
+            <div class="position-relative">
+                <input type="text" name="q" class="form-control admin-input font-sans py-2 ps-4 pe-3 text-white" value="{{ q }}" placeholder="Type student name/email, subject, program, chapter, or material title..." required minlength="2">
+                <i class="fas fa-search position-absolute top-50 start-0 translate-middle-y ms-2.5 text-muted" style="margin-left: 10px;"></i>
+            </div>
+        </div>
+        <div class="col-12 col-md-4 d-flex gap-2">
+            <button type="submit" class="btn btn-admin btn-admin-primary w-100">
+                <i class="fas fa-search me-1"></i> Search System
+            </button>
+            {% if q %}
+            <a href="{{ url_for('admin.search') }}" class="btn btn-admin btn-admin-secondary" title="Clear Search">
+                <i class="fas fa-times"></i>
+            </a>
+            {% endif %}
+        </div>
+    </form>
+</div>
+
+{% if q %}
+<!-- Search Results Header -->
+<div class="d-flex align-items-center justify-content-between mb-3">
+    <div class="text-muted small">
+        Found <span class="fw-bold text-white font-mono fs-6">{{ total_matches }}</span> matching records for query: <code class="text-primary font-mono fw-bold">"{{ q }}"</code>
+    </div>
+</div>
+
+<!-- Categorized Search Results -->
+{% if total_matches > 0 %}
+<div class="row g-4 mb-4">
+
+    <!-- 1. Students Results -->
+    {% if results.students %}
+    <div class="col-lg-6">
+        <div class="admin-card h-100 mb-0">
+            <div class="admin-card-header">
+                <h2 class="admin-card-title"><i class="fas fa-user-graduate text-primary"></i> Students</h2>
+                <span class="badge bg-primary-subtle text-primary border border-primary-subtle px-2 py-0.5 font-mono">{{ results.students|length }} matches</span>
+            </div>
+            <div class="d-flex flex-column gap-2">
+                {% for item in results.students %}
+                <div class="p-2.5 rounded d-flex align-items-center justify-content-between" style="background: rgba(255,255,255,0.02); border: 1px solid var(--admin-border);">
+                    <div>
+                        <div class="fw-bold text-white fs-6">{{ item.name }}</div>
+                        <div class="text-muted x-small font-mono">{{ item.email }} &bull; Level: {{ item.level }}</div>
+                    </div>
+                    <a href="{{ item.url }}" class="btn btn-admin btn-admin-secondary btn-admin-sm">
+                        <i class="fas fa-eye me-1"></i> View Detail
+                    </a>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- 2. Programs Results -->
+    {% if results.programs %}
+    <div class="col-lg-6">
+        <div class="admin-card h-100 mb-0">
+            <div class="admin-card-header">
+                <h2 class="admin-card-title"><i class="fas fa-graduation-cap text-info"></i> Academic Programs</h2>
+                <span class="badge bg-info-subtle text-info border border-info-subtle px-2 py-0.5 font-mono">{{ results.programs|length }} matches</span>
+            </div>
+            <div class="d-flex flex-column gap-2">
+                {% for item in results.programs %}
+                <div class="p-2.5 rounded d-flex align-items-center justify-content-between" style="background: rgba(255,255,255,0.02); border: 1px solid var(--admin-border);">
+                    <div>
+                        <div class="fw-bold text-white fs-6">{{ item.name }}</div>
+                        <div class="text-muted x-small font-mono">Code: {{ item.code or 'N/A' }} &bull; Level: {{ item.level }}</div>
+                    </div>
+                    <a href="{{ item.url }}" class="btn btn-admin btn-admin-secondary btn-admin-sm">
+                        <i class="fas fa-layer-group me-1"></i> Structure
+                    </a>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- 3. Subjects Results -->
+    {% if results.subjects %}
+    <div class="col-lg-6">
+        <div class="admin-card h-100 mb-0">
+            <div class="admin-card-header">
+                <h2 class="admin-card-title"><i class="fas fa-book text-success"></i> Global Subjects</h2>
+                <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-0.5 font-mono">{{ results.subjects|length }} matches</span>
+            </div>
+            <div class="d-flex flex-column gap-2">
+                {% for item in results.subjects %}
+                <div class="p-2.5 rounded d-flex align-items-center justify-content-between" style="background: rgba(255,255,255,0.02); border: 1px solid var(--admin-border);">
+                    <div>
+                        <div class="fw-bold text-white fs-6">{{ item.name }}</div>
+                        <div class="text-muted x-small font-mono">Code: {{ item.code or 'N/A' }} &bull; Level: {{ item.level }}</div>
+                    </div>
+                    <a href="{{ item.url }}" class="btn btn-admin btn-admin-secondary btn-admin-sm">
+                        <i class="fas fa-list me-1"></i> Catalog
+                    </a>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- 4. Chapters & Topics Results -->
+    {% if results.chapters or results.topics %}
+    <div class="col-lg-6">
+        <div class="admin-card h-100 mb-0">
+            <div class="admin-card-header">
+                <h2 class="admin-card-title"><i class="fas fa-folder-tree text-warning"></i> Chapters &amp; Topics</h2>
+                <span class="badge bg-warning-subtle text-warning border border-warning-subtle px-2 py-0.5 font-mono">{{ results.chapters|length + results.topics|length }} matches</span>
+            </div>
+            <div class="d-flex flex-column gap-2">
+                {% for item in results.chapters %}
+                <div class="p-2.5 rounded d-flex align-items-center justify-content-between" style="background: rgba(255,255,255,0.02); border: 1px solid var(--admin-border);">
+                    <div>
+                        <span class="badge bg-secondary-subtle text-white border border-secondary me-1">Chapter {{ item.chapter_number }}</span>
+                        <span class="fw-bold text-white fs-6">{{ item.name }}</span>
+                        <div class="text-muted x-small">Subject: {{ item.subject }}</div>
+                    </div>
+                    <a href="{{ item.url }}" class="btn btn-admin btn-admin-secondary btn-admin-sm">
+                        <i class="fas fa-folder me-1"></i> Chapters
+                    </a>
+                </div>
+                {% endfor %}
+
+                {% for item in results.topics %}
+                <div class="p-2.5 rounded d-flex align-items-center justify-content-between" style="background: rgba(255,255,255,0.02); border: 1px solid var(--admin-border);">
+                    <div>
+                        <span class="badge bg-info-subtle text-info border border-info-subtle me-1">Topic</span>
+                        <span class="fw-bold text-white fs-6">{{ item.name }}</span>
+                        <div class="text-muted x-small">Chapter: {{ item.chapter }}</div>
+                    </div>
+                    <a href="{{ item.url }}" class="btn btn-admin btn-admin-secondary btn-admin-sm">
+                        <i class="fas fa-magnifying-glass me-1"></i> Find Material
+                    </a>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- 5. Learning Materials Results -->
+    {% if results.materials %}
+    <div class="col-lg-6">
+        <div class="admin-card h-100 mb-0">
+            <div class="admin-card-header">
+                <h2 class="admin-card-title"><i class="fas fa-book-journal-whills text-primary"></i> Learning Materials</h2>
+                <span class="badge bg-primary-subtle text-primary border border-primary-subtle px-2 py-0.5 font-mono">{{ results.materials|length }} matches</span>
+            </div>
+            <div class="d-flex flex-column gap-2">
+                {% for item in results.materials %}
+                <div class="p-2.5 rounded d-flex align-items-center justify-content-between" style="background: rgba(255,255,255,0.02); border: 1px solid var(--admin-border);">
+                    <div>
+                        <div class="fw-bold text-white fs-6">{{ item.title }}</div>
+                        <div class="text-muted x-small">Topic: {{ item.topic }} &bull; Subject: {{ item.subject }}</div>
+                    </div>
+                    <a href="{{ item.url }}" class="btn btn-admin btn-admin-secondary btn-admin-sm">
+                        <i class="fas fa-file-alt me-1"></i> Preview
+                    </a>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- 6. Universities & Faculties Results -->
+    {% if results.universities or results.faculties %}
+    <div class="col-lg-6">
+        <div class="admin-card h-100 mb-0">
+            <div class="admin-card-header">
+                <h2 class="admin-card-title"><i class="fas fa-university text-secondary"></i> Universities &amp; Faculties</h2>
+                <span class="badge bg-secondary-subtle text-white border border-secondary px-2 py-0.5 font-mono">{{ results.universities|length + results.faculties|length }} matches</span>
+            </div>
+            <div class="d-flex flex-column gap-2">
+                {% for item in results.universities %}
+                <div class="p-2.5 rounded d-flex align-items-center justify-content-between" style="background: rgba(255,255,255,0.02); border: 1px solid var(--admin-border);">
+                    <div>
+                        <span class="badge bg-primary-subtle text-primary border border-primary-subtle me-1">University</span>
+                        <span class="fw-bold text-white fs-6">{{ item.name }}</span>
+                        <div class="text-muted x-small font-mono">Country: {{ item.country }}</div>
+                    </div>
+                    <a href="{{ item.url }}" class="btn btn-admin btn-admin-secondary btn-admin-sm">
+                        <i class="fas fa-landmark me-1"></i> View
+                    </a>
+                </div>
+                {% endfor %}
+
+                {% for item in results.faculties %}
+                <div class="p-2.5 rounded d-flex align-items-center justify-content-between" style="background: rgba(255,255,255,0.02); border: 1px solid var(--admin-border);">
+                    <div>
+                        <span class="badge bg-info-subtle text-info border border-info-subtle me-1">Faculty</span>
+                        <span class="fw-bold text-white fs-6">{{ item.name }}</span>
+                        <div class="text-muted x-small">University: {{ item.university }}</div>
+                    </div>
+                    <a href="{{ item.url }}" class="btn btn-admin btn-admin-secondary btn-admin-sm">
+                        <i class="fas fa-landmark me-1"></i> View
+                    </a>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+</div>
+{% else %}
+<div class="admin-card p-5 text-center text-muted">
+    <i class="fas fa-search fs-1 text-dim mb-3 d-block"></i>
+    <div class="fw-bold text-white fs-5 mb-1">No matching records found</div>
+    <div class="small text-dim">No results matched your query <code>"{{ q }}"</code> across Students, Programs, Subjects, Chapters, Topics, or Learning Materials.</div>
+</div>
+{% endif %}
+{% endif %}
+{% endblock %}

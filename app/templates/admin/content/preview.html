@@ -1,0 +1,125 @@
+{% extends 'admin/admin_base.html' %}
+{% block title %}Preview — {{ material.title }}{% endblock %}
+
+{% block breadcrumb_items %}
+    <a href="{{ url_for('admin.content_stats') }}">Content</a>
+    <span class="sep"><i class="fas fa-chevron-right"></i></span>
+    <a href="{{ url_for('admin.content_materials') }}">Learning Materials</a>
+    <span class="sep"><i class="fas fa-chevron-right"></i></span>
+    <span class="active-item">Preview</span>
+{% endblock %}
+
+{% block admin_content %}
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+    <div>
+        <h1 class="h3 fw-bold text-white mb-1"><i class="fas fa-eye me-2 text-primary"></i> Learning Material Read-Only Preview</h1>
+        <p class="text-muted small mb-0">
+            ID #{{ material.id }} &bull; Title: <strong class="text-white">{{ material.title }}</strong>
+        </p>
+    </div>
+    <div class="d-flex gap-2">
+        <a href="{{ url_for('admin.content_materials') }}" class="btn btn-admin btn-admin-secondary btn-admin-sm">
+            <i class="fas fa-arrow-left me-1"></i> Back to Materials Directory
+        </a>
+        {% if subject %}
+        <a href="{{ url_for('student.study_subject', subject_id=subject.id) }}" target="_blank" class="btn btn-admin btn-admin-primary btn-admin-sm">
+            <i class="fas fa-book-open me-1"></i> Open Student Reader
+        </a>
+        {% endif %}
+        {% if topic %}
+        <a href="{{ url_for('student.get_chapter_pdf', topic_id=topic.id) }}" target="_blank" class="btn btn-admin btn-admin-secondary btn-admin-sm text-success">
+            <i class="fas fa-file-pdf me-1"></i> Download PDF
+        </a>
+        {% endif %}
+
+    </div>
+</div>
+
+<!-- Metadata Cards -->
+<div class="row g-3 mb-4">
+    <div class="col-md-3">
+        <div class="admin-card p-3 mb-0">
+            <div class="text-dim small fw-semibold">Subject</div>
+            <div class="fw-bold text-white fs-6 mt-1">{{ subject.name if subject else 'Unassigned' }}</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="admin-card p-3 mb-0">
+            <div class="text-dim small fw-semibold">Chapter</div>
+            <div class="fw-bold text-white fs-6 mt-1">{{ chapter.name if chapter else 'Unassigned' }}</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="admin-card p-3 mb-0">
+            <div class="text-dim small fw-semibold">Topic</div>
+            <div class="fw-bold text-white fs-6 mt-1">{{ topic.name if topic else 'Unassigned' }}</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="admin-card p-3 mb-0">
+            <div class="text-dim small fw-semibold">Content Metrics</div>
+            <div class="fw-bold text-white fs-6 mt-1">{{ content_len }} chars &bull; {{ material.estimated_reading_time or 10 }} min read</div>
+        </div>
+    </div>
+</div>
+
+<!-- Material Content View -->
+<div class="admin-card mb-4">
+    <div class="admin-card-header">
+        <h2 class="admin-card-title"><i class="fas fa-file-lines text-primary"></i> Material Content</h2>
+        <span class="badge-status active"><i class="fas fa-check-circle"></i> Active &amp; Readable</span>
+    </div>
+
+    <!-- Introduction -->
+    {% if material.introduction %}
+    <div class="mb-4">
+        <h3 class="h6 fw-bold text-primary mb-2"><i class="fas fa-info-circle me-1"></i> Introduction</h3>
+        <div class="p-3 rounded text-white-50" style="background: rgba(0,0,0,0.2); border: 1px solid var(--admin-border); font-size: 0.92rem; line-height: 1.6;">
+            {{ material.introduction | safe }}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Concepts -->
+    {% if material.concepts %}
+    <div class="mb-4">
+        <h3 class="h6 fw-bold text-info mb-2"><i class="fas fa-lightbulb me-1"></i> Key Concepts</h3>
+        <div class="p-3 rounded text-white-50" style="background: rgba(0,0,0,0.2); border: 1px solid var(--admin-border); font-size: 0.92rem; line-height: 1.6;">
+            {{ material.concepts | safe }}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Detailed Explanation -->
+    {% if material.detailed_explanation %}
+    <div class="mb-4">
+        <h3 class="h6 fw-bold text-white mb-2"><i class="fas fa-align-left me-1"></i> Detailed Explanation</h3>
+        <div class="p-3 rounded text-white-50" style="background: rgba(0,0,0,0.2); border: 1px solid var(--admin-border); font-size: 0.92rem; line-height: 1.6;">
+            {{ material.detailed_explanation | safe }}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Important Definitions / Common Mistakes / Summary -->
+    {% if material.summary or material.important_definitions %}
+    <div class="row g-3 mt-2">
+        {% if material.summary %}
+        <div class="col-md-6">
+            <h3 class="h6 fw-bold text-warning mb-2"><i class="fas fa-bookmark me-1"></i> Summary</h3>
+            <div class="p-3 rounded text-white-50" style="background: rgba(0,0,0,0.2); border: 1px solid var(--admin-border); font-size: 0.88rem;">
+                {{ material.summary | safe }}
+            </div>
+        </div>
+        {% endif %}
+        {% if material.important_definitions %}
+        <div class="col-md-6">
+            <h3 class="h6 fw-bold text-success mb-2"><i class="fas fa-list me-1"></i> Important Definitions</h3>
+            <div class="p-3 rounded text-white-50" style="background: rgba(0,0,0,0.2); border: 1px solid var(--admin-border); font-size: 0.88rem;">
+                {{ material.important_definitions | safe }}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

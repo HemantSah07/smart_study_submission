@@ -1,0 +1,347 @@
+{% extends 'admin/admin_base.html' %}
+{% block title %}{{ prog.name }} — Program Structure & Subjects{% endblock %}
+
+{% block breadcrumb_items %}
+    <a href="{{ url_for('admin.curriculum_levels') }}">Curriculum</a>
+    <span class="sep"><i class="fas fa-chevron-right"></i></span>
+    <a href="{{ url_for('admin.curriculum_programs') }}">Programs</a>
+    <span class="sep"><i class="fas fa-chevron-right"></i></span>
+    <span class="active-item">{{ prog.name }}</span>
+{% endblock %}
+
+{% block admin_content %}
+<!-- Header Bar -->
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+    <div>
+        <div class="d-flex align-items-center gap-2 mb-1">
+            <h1 class="h3 fw-bold text-white mb-0"><i class="fas fa-graduation-cap me-2 text-primary"></i> {{ prog.name }}</h1>
+            <span class="badge bg-primary-subtle text-primary border border-primary-subtle px-2 py-1">{{ prog.level_name }}</span>
+            {% if prog.is_active %}
+                <span class="badge-status active"><i class="fas fa-check-circle"></i> Active</span>
+            {% else %}
+                <span class="badge-status error"><i class="fas fa-ban"></i> Archived</span>
+            {% endif %}
+        </div>
+        <p class="text-muted small mb-0">
+            <i class="fas fa-layer-group me-1 text-primary"></i> {{ total_subjects }} subjects mapped &bull; 
+            <i class="fas fa-user-graduate me-1 text-success"></i> {{ usage_count }} student(s) enrolled
+        </p>
+    </div>
+
+    <!-- Action Toolbar -->
+    <div class="d-flex flex-wrap gap-2">
+        <button class="btn btn-admin btn-admin-secondary btn-admin-sm" data-bs-toggle="modal" data-bs-target="#copyFromModal">
+            <i class="fas fa-copy me-1"></i> Copy from Program
+        </button>
+        <button class="btn btn-admin btn-admin-secondary btn-admin-sm" id="bulkDetachToggle">
+            <i class="fas fa-unlink text-warning me-1"></i> Bulk Detach Mode
+        </button>
+        <button class="btn btn-admin btn-admin-primary btn-admin-sm" data-bs-toggle="modal" data-bs-target="#attachModal">
+            <i class="fas fa-plus me-1"></i> Attach Existing Subject
+        </button>
+        <button class="btn btn-admin btn-admin-secondary btn-admin-sm text-success" data-bs-toggle="modal" data-bs-target="#createSubjectModal">
+            <i class="fas fa-plus-circle me-1"></i> Create & Attach Subject
+        </button>
+    </div>
+</div>
+
+<!-- Bulk Detach Form (Toggled via JS) -->
+<form id="bulkDetachForm" method="POST" action="{{ url_for('admin.curriculum_program_bulk_detach', prog_id=prog.id) }}" style="display:none;" class="mb-4">
+    <div class="p-3 rounded mb-3 d-flex align-items-center justify-content-between" style="background: rgba(239, 68, 68, 0.12); border: 1px solid var(--admin-danger);">
+        <div class="small text-white">
+            <i class="fas fa-exclamation-triangle text-danger me-2"></i>
+            <strong>BULK DETACH MODE:</strong> Check subjects below and click "Confirm Bulk Detach". Only program-subject mappings are removed; global subjects are preserved.
+        </div>
+        <div class="d-flex gap-2">
+            <button type="submit" class="btn btn-admin btn-admin-danger btn-admin-sm" onclick="return confirm('Detach selected subjects from this program?')">
+                <i class="fas fa-unlink me-1"></i> Confirm Bulk Detach
+            </button>
+            <button type="button" class="btn btn-admin btn-admin-secondary btn-admin-sm" id="bulkDetachCancel">Cancel</button>
+        </div>
+    </div>
+</form>
+
+<!-- Program Structure View (Grouped by Semester) -->
+{% if semesters_ordered %}
+    {% for sem in semesters_ordered %}
+    <div class="admin-card mb-4 p-0" style="overflow: hidden;">
+        <div class="admin-card-header px-4 py-3 mb-0" style="background: rgba(31, 41, 55, 0.4);">
+            <div class="d-flex align-items-center justify-content-between">
+                <h2 class="admin-card-title mb-0 fs-6"><i class="fas fa-layer-group text-primary"></i> {{ sem }}</h2>
+                <span class="badge-status active"><i class="fas fa-book"></i> {{ by_semester[sem]|length }} subjects</span>
+            </div>
+        </div>
+        <div class="admin-table-container border-0">
+            <table class="admin-table">
+                <thead>
+                    <tr>
+                        <th style="width: 40px;" class="ps-4"></th>
+                        <th style="width: 120px;">Subject Code</th>
+                        <th>Subject Name</th>
+                        <th>Credits & Difficulty</th>
+                        <th>Term Grouping</th>
+                        <th class="pe-4 text-end">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="sortable-tbody" data-prog="{{ prog.id }}">
+                    {% for m in by_semester[sem] %}
+                    <tr class="sortable-row" data-ps-id="{{ m.id }}">
+                        <td class="ps-4 text-muted drag-handle" style="cursor: grab;">
+                            <input type="checkbox" name="ps_ids" value="{{ m.id }}" class="form-check-input bulk-check me-2" style="display:none;" form="bulkDetachForm">
+                            <i class="fas fa-grip-vertical text-dim"></i>
+                        </td>
+                        <td>
+                            {% if m.subject and m.subject.code %}
+                            <span class="badge bg-primary-subtle text-primary border border-primary-subtle px-2 py-1 font-mono fw-bold">{{ m.subject.code }}</span>
+                            {% else %}
+                            <span class="text-dim small">—</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <div class="fw-bold text-white fs-6">{{ m.subject.name if m.subject else '(deleted subject)' }}</div>
+                            <div class="text-dim small">Global Subject ID #{{ m.subject_id }}</div>
+                        </td>
+                        <td class="small">
+                            <span class="text-white fw-semibold">{{ m.subject.credit_hours if m.subject else 3 }} Cr</span> &bull; 
+                            <span class="text-muted">Diff {{ m.subject.difficulty_level if m.subject else 3 }}/5</span>
+                        </td>
+                        <td class="small text-muted">{{ m.term or 'Core' }}</td>
+                        <td class="pe-4 text-end">
+                            <div class="d-inline-flex gap-1">
+                                <button type="button" class="btn btn-admin btn-admin-secondary btn-admin-sm"
+                                    data-bs-toggle="modal" data-bs-target="#editMappingModal"
+                                    data-ps-id="{{ m.id }}"
+                                    data-semester="{{ m.semester or '' }}"
+                                    data-term="{{ m.term or '' }}"
+                                    data-sort="{{ m.sort_order }}"
+                                    data-subj="{{ m.subject.name if m.subject else '' }}">
+                                    <i class="fas fa-pen"></i> Edit
+                                </button>
+                                <form method="POST" action="{{ url_for('admin.curriculum_program_detach_subject', prog_id=prog.id, ps_id=m.id) }}"
+                                    onsubmit="return confirm('Detach this subject from {{ prog.name }}? The global subject record will remain intact.');" class="d-inline">
+                                    <button type="submit" class="btn btn-admin btn-admin-danger btn-admin-sm" title="Detach mapping only">
+                                        <i class="fas fa-unlink"></i> Detach
+                                    </button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endfor %}
+{% else %}
+    <div class="admin-card p-5 text-center text-muted">
+        <i class="fas fa-book-open fs-1 mb-3 text-dim d-block"></i>
+        <h3 class="h5 fw-bold text-white mb-2">No subjects mapped to {{ prog.name }} yet</h3>
+        <p class="small text-muted mb-3">Attach existing global subjects or create new subjects to configure this program's semester structure.</p>
+        <div class="d-flex justify-content-center gap-2">
+            <button class="btn btn-admin btn-admin-primary" data-bs-toggle="modal" data-bs-target="#attachModal">
+                <i class="fas fa-plus me-1"></i> Attach Existing Subject
+            </button>
+            <button class="btn btn-admin btn-admin-secondary" data-bs-toggle="modal" data-bs-target="#copyFromModal">
+                <i class="fas fa-copy me-1"></i> Copy from Program
+            </button>
+        </div>
+    </div>
+{% endif %}
+
+<!-- Modal: Attach Existing Subject -->
+<div class="modal fade admin-modal" id="attachModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+            <form action="{{ url_for('admin.curriculum_program_attach_subject', prog_id=prog.id) }}" method="POST">
+                <div class="modal-header">
+                    <h5 class="modal-title fw-bold text-white"><i class="fas fa-plus text-primary me-2"></i> Attach Existing Subject</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label text-muted small fw-semibold">Select Global Subject</label>
+                        <select name="subject_id" class="form-select admin-form-control" required>
+                            <option value="">-- Choose Subject ({{ available_subjects|length }} available) --</option>
+                            {% for subj in available_subjects %}
+                            <option value="{{ subj.id }}">{{ subj.name }} ({{ subj.code or 'No code' }} &bull; {{ subj.level_of_study }})</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label text-muted small fw-semibold">Semester</label>
+                            <input type="text" name="semester" class="form-control admin-form-control" placeholder="e.g. Semester 1" value="Semester 1">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label text-muted small fw-semibold">Term / Category (Optional)</label>
+                            <input type="text" name="term" class="form-control admin-form-control" placeholder="e.g. Core or Elective">
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-admin btn-admin-secondary btn-admin-sm" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-admin btn-admin-primary btn-admin-sm">Attach Subject</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Create & Attach Subject -->
+<div class="modal fade admin-modal" id="createSubjectModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+            <form action="{{ url_for('admin.curriculum_program_create_subject', prog_id=prog.id) }}" method="POST">
+                <div class="modal-header">
+                    <h5 class="modal-title fw-bold text-white"><i class="fas fa-plus-circle text-success me-2"></i> Create & Attach New Subject</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label text-muted small fw-semibold">Subject Name</label>
+                            <input type="text" name="name" class="form-control admin-form-control" placeholder="e.g. Cloud Security" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label text-muted small fw-semibold">Subject Code</label>
+                            <input type="text" name="code" class="form-control admin-form-control" placeholder="e.g. CLD-301">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label text-muted small fw-semibold">Semester</label>
+                            <input type="text" name="semester" class="form-control admin-form-control" value="Semester 1">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label text-muted small fw-semibold">Term / Category</label>
+                            <input type="text" name="term" class="form-control admin-form-control" placeholder="e.g. Core">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label text-muted small fw-semibold">Credit Hours</label>
+                            <input type="number" name="credit_hours" class="form-control admin-form-control" value="3" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label text-muted small fw-semibold">Difficulty Level (1-5)</label>
+                            <input type="number" name="difficulty_level" class="form-control admin-form-control" min="1" max="5" value="3" required>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-admin btn-admin-secondary btn-admin-sm" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-admin btn-admin-primary btn-admin-sm">Create & Attach</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Copy Subjects From Program -->
+<div class="modal fade admin-modal" id="copyFromModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <form action="{{ url_for('admin.curriculum_program_copy_preview', prog_id=prog.id) }}" method="POST">
+                <div class="modal-header">
+                    <h5 class="modal-title fw-bold text-white"><i class="fas fa-copy text-info me-2"></i> Copy Subjects from Another Program</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label text-muted small fw-semibold">Select Source Program</label>
+                        <select name="source_program_id" class="form-select admin-form-control" required>
+                            <option value="">-- Choose Source Program --</option>
+                            {% for p in other_programs %}
+                            <option value="{{ p.id }}">{{ p.name }} ({{ p.level_name }})</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-admin btn-admin-secondary btn-admin-sm" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-admin btn-admin-primary btn-admin-sm">Preview Copy</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Edit Mapping -->
+<div class="modal fade admin-modal" id="editMappingModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <form id="editMappingForm" method="POST" action="">
+                <div class="modal-header">
+                    <h5 class="modal-title fw-bold text-white"><i class="fas fa-pen text-primary me-2"></i> Edit Subject Mapping</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label text-muted small fw-semibold">Subject</label>
+                        <input type="text" id="modalSubjName" class="form-control admin-form-control" disabled>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label text-muted small fw-semibold">Semester</label>
+                        <input type="text" name="semester" id="modalSemester" class="form-control admin-form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label text-muted small fw-semibold">Term Grouping</label>
+                        <input type="text" name="term" id="modalTerm" class="form-control admin-form-control">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label text-muted small fw-semibold">Sort Order</label>
+                        <input type="number" name="sort_order" id="modalSortOrder" class="form-control admin-form-control">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-admin btn-admin-secondary btn-admin-sm" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-admin btn-admin-primary btn-admin-sm">Save Mapping</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        // Toggle Bulk Detach Mode
+        const toggleBtn = document.getElementById("bulkDetachToggle");
+        const cancelBtn = document.getElementById("bulkDetachCancel");
+        const form = document.getElementById("bulkDetachForm");
+        const checks = document.querySelectorAll(".bulk-check");
+
+        if (toggleBtn && form) {
+            toggleBtn.addEventListener("click", function() {
+                const isHidden = form.style.display === "none";
+                form.style.display = isHidden ? "block" : "none";
+                checks.forEach(c => c.style.display = isHidden ? "inline-block" : "none");
+            });
+        }
+        if (cancelBtn && form) {
+            cancelBtn.addEventListener("click", function() {
+                form.style.display = "none";
+                checks.forEach(c => c.style.display = "none");
+            });
+        }
+
+        // Populate Edit Mapping Modal
+        const editModal = document.getElementById('editMappingModal');
+        if (editModal) {
+            editModal.addEventListener('show.bs.modal', function(event) {
+                const button = event.relatedTarget;
+                const psId = button.getAttribute('data-ps-id');
+                const sem = button.getAttribute('data-semester');
+                const term = button.getAttribute('data-term');
+                const sort = button.getAttribute('data-sort');
+                const subj = button.getAttribute('data-subj');
+
+                document.getElementById('modalSubjName').value = subj;
+                document.getElementById('modalSemester').value = sem;
+                document.getElementById('modalTerm').value = term;
+                document.getElementById('modalSortOrder').value = sort;
+
+                const form = document.getElementById('editMappingForm');
+                form.action = `/admin/curriculum/programs/{{ prog.id }}/subjects/${psId}/edit`;
+            });
+        }
+    });
+</script>
+{% endblock %}

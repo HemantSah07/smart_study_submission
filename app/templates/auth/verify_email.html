@@ -1,0 +1,106 @@
+{% extends 'base.html' %}
+{% block title %}Verify Email - Smart Study{% endblock %}
+
+{% block content %}
+<div class="auth-split">
+    <div class="auth-brand-panel">
+        <div class="mb-4">
+            <i class="fas fa-envelope text-gradient" style="font-size: 3rem;"></i>
+        </div>
+        <h2 class="fw-bold mb-3">Email Verification Required</h2>
+        <p class="text-muted mb-4">We've sent a 6-digit verification code to your email to verify your identity before creating your account.</p>
+        <ul class="list-unstyled text-muted">
+            <li class="mb-2"><i class="fas fa-check text-gradient me-2"></i> Security protection against bot signups</li>
+            <li class="mb-2"><i class="fas fa-check text-gradient me-2"></i> Verified student accounts</li>
+            <li class="mb-2"><i class="fas fa-check text-gradient me-2"></i> Instant code delivery</li>
+        </ul>
+    </div>
+    <div class="card auth-card card-flat">
+        <div class="text-center mb-4">
+            <h3 class="fw-bold text-gradient">Verify Your Email</h3>
+            <p class="text-muted small">Verification code sent to:<br><strong class="text-white">{{ email }}</strong></p>
+        </div>
+
+        <form id="verifyForm" method="POST" action="{{ url_for('auth.verify_email_code', email=email) }}">
+            <div class="mb-4">
+                <label class="form-label">Verification Code (6 Digits)</label>
+                <input type="text" id="verification_code" name="code" class="form-control text-center fs-4 fw-bold letter-spacing-lg" placeholder="000000" maxlength="6" pattern="\d{6}" required autocomplete="off">
+                <div class="invalid-feedback" id="codeError">Code must be exactly 6 digits.</div>
+            </div>
+            
+            <button type="submit" id="submitBtn" class="btn btn-primary w-100 py-3" disabled>
+                <span id="btnText">Verify Code</span>
+                <span id="loadingSpinner" class="spinner-border spinner-border-sm d-none"></span>
+            </button>
+        </form>
+
+        <form id="resendForm" method="POST" action="{{ url_for('auth.resend_verification_code', email=email) }}" class="text-center mt-4">
+            <p class="text-muted small mb-2">Didn't receive the email?</p>
+            <button type="submit" id="resendBtn" class="btn btn-outline-secondary btn-sm px-4 py-2">
+                Resend Code
+            </button>
+            <p class="text-muted small mt-2 mb-0">Resends used: <span class="fw-bold text-white">{{ resend_count }}/3</span></p>
+        </form>
+
+        <p class="text-center text-muted small mt-4 mb-0">
+            Wrong email? <a href="{{ url_for('auth.register') }}" class="text-gradient fw-bold text-decoration-none">Start Over</a>
+        </p>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const codeInput = document.getElementById('verification_code');
+    const submitBtn = document.getElementById('submitBtn');
+    const resendBtn = document.getElementById('resendBtn');
+
+    // Enable verify button only when 6 digits are typed
+    codeInput.addEventListener('input', function() {
+        // filter non-digits
+        this.value = this.value.replace(/\D/g, '');
+        const isValid = this.value.length === 6;
+        submitBtn.disabled = !isValid;
+        codeInput.classList.toggle('is-invalid', this.value.length > 0 && !isValid);
+    });
+
+    // Handle timer for resend button
+    let timeRemaining = parseInt("{{ time_remaining }}") || 0;
+    const maxResendsReached = ("{{ resend_count }}" >= 3);
+
+    if (maxResendsReached) {
+        resendBtn.disabled = true;
+        resendBtn.textContent = "Resend Limit Reached";
+    } else if (timeRemaining > 0) {
+        updateResendTimer();
+    }
+
+    function updateResendTimer() {
+        if (timeRemaining > 0) {
+            resendBtn.disabled = true;
+            resendBtn.textContent = `Resend in ${timeRemaining}s`;
+            timeRemaining--;
+            setTimeout(updateResendTimer, 1000);
+        } else {
+            resendBtn.disabled = false;
+            resendBtn.textContent = "Resend Code";
+        }
+    }
+
+    document.getElementById('verifyForm').addEventListener('submit', function() {
+        submitBtn.disabled = true;
+        document.getElementById('btnText').classList.add('d-none');
+        document.getElementById('loadingSpinner').classList.remove('d-none');
+    });
+
+    document.getElementById('resendForm').addEventListener('submit', function() {
+        resendBtn.disabled = true;
+    });
+});
+</script>
+
+<style>
+.letter-spacing-lg {
+    letter-spacing: 0.25rem;
+}
+</style>
+{% endblock %}

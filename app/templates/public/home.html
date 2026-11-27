@@ -1,0 +1,132 @@
+{% extends 'base.html' %}
+{% block title %}Smart Study — Know What to Study. Know When to Study. Study Smarter.{% endblock %}
+
+{% block head %}
+<meta name="description" content="Smart Study helps students understand their academic performance, identify subjects that need attention, create personalised study plans, and track their progress.">
+{% endblock %}
+
+{% block content %}
+{# ── Cinematic Hero Section ─────────────────────────────────────────────── #}
+<section class="ss-page-hero position-relative text-center overflow-hidden my-3">
+    <div class="ss-page-hero-bg" style="background-image: url('{{ url_for('static', filename='img/ui/public/home-hero.webp') }}');"></div>
+    <div class="ss-page-hero-content py-4">
+        <div class="ss-badge ss-badge-cyan mb-3">
+            <i class="fas fa-microchip me-1"></i> AI-Powered Personal Academic Operating System
+        </div>
+        <h1 class="display-4 fw-extrabold text-white mb-3" style="letter-spacing:-0.03em;">
+            Know What to Study.<br class="d-none d-md-block"> Know When to Study.<br>
+            <span class="text-gradient">Study Smarter.</span>
+        </h1>
+        <p class="ss-hero-sub text-muted mx-auto mb-4" style="max-width:640px;font-size:1.1rem;line-height:1.65;">
+            Smart Study helps students understand their academic performance, identify subjects that need attention, create personalised study plans, and track their progress — all in one unified platform.
+        </p>
+        <div class="d-flex flex-wrap gap-3 justify-content-center mb-4">
+            <a href="{{ url_for('auth.register') }}" class="btn btn-primary px-5 py-3 shadow-lg" style="font-size:1.05rem;font-weight:700;border-radius:12px;">
+                Get Started Free <i class="fas fa-arrow-right ms-2"></i>
+            </a>
+            <a href="{{ url_for('main.app_tour') }}" class="btn btn-outline-light px-5 py-3" style="font-size:1.05rem;font-weight:600;border-radius:12px;background:rgba(255,255,255,0.05);border-color:rgba(255,255,255,0.15);">
+                See How It Works
+            </a>
+        </div>
+    </div>
+</section>
+
+{# ── Benefits grid ──────────────────────────────────────────────────────── #}
+<div class="ss-section">
+    <div class="row g-4">
+        <div class="col-md-6 col-lg-3">
+            <div class="ss-card">
+                <div class="ss-stat-icon mb-3" style="background:rgba(56,189,248,0.15);color:var(--blue);">
+                    <i class="fas fa-search-plus"></i>
+                </div>
+                <h5 class="fw-bold mb-2 text-white">Identify What Needs Attention</h5>
+                <p class="text-muted small mb-0">
+                    Smart Study analyses your assessment scores, grades, and study patterns to flag subjects that are at academic risk — before it's too late.
+                </p>
+            </div>
+        </div>
+        <div class="col-md-6 col-lg-3">
+            <div class="ss-card">
+                <div class="ss-stat-icon mb-3" style="background:rgba(168,85,247,0.15);color:var(--purple);">
+                    <i class="fas fa-calendar-alt"></i>
+                </div>
+                <h5 class="fw-bold mb-2 text-white">Build a Realistic Study Plan</h5>
+                <p class="text-muted small mb-0">
+                    Your personalised weekly schedule balances all your subjects based on risk level, time available, and exam proximity — automatically.
+                </p>
+            </div>
+        </div>
+        <div class="col-md-6 col-lg-3">
+            <div class="ss-card">
+                <div class="ss-stat-icon mb-3" style="background:rgba(52,211,153,0.15);color:var(--green);">
+                    <i class="fas fa-chart-line"></i>
+                </div>
+                <h5 class="fw-bold mb-2 text-white">Track Your Progress</h5>
+                <p class="text-muted small mb-0">
+                    Log your study sessions and watch your consistency improve. See which weeks you're excelling and where you're falling behind.
+                </p>
+            </div>
+        </div>
+        <div class="col-md-6 col-lg-3">
+            <div class="ss-card">
+                <div class="ss-stat-icon mb-3" style="background:rgba(251,191,36,0.15);color:var(--amber);">
+                    <i class="fas fa-robot"></i>
+                </div>
+                <h5 class="fw-bold mb-2 text-white">Ask Your AI Study Coach</h5>
+                <p class="text-muted small mb-0">
+                    Get instant explanations, topic summaries, study strategies, and personalised advice — right when you need it.
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+
+{# ── How it works ────────────────────────────────────────────────────────── #}
+<section class="ss-panel text-center mb-5 p-4 p-md-5">
+    <div class="ss-badge ss-badge-purple mb-3">Workflow</div>
+    <h2 class="text-gradient fw-bold mb-2" style="font-size:clamp(1.5rem,3vw,2.25rem);letter-spacing:-0.025em;">
+        A Simple Journey to Better Academic Results
+    </h2>
+    <p class="text-muted mb-5 mx-auto" style="max-width:540px;">
+        Smart Study guides you from understanding your current performance to consistently studying and improving.
+    </p>
+
+    <div class="row g-4 text-center">
+        {% set steps = [
+            ('fa-user-edit', 'blue', '1', 'Set Up Your Profile', 'Tell Smart Study your study level, subjects, and schedule so it can tailor everything for you.'),
+            ('fa-brain', 'purple', '2', 'Take an Assessment', 'Answer adaptive questions to give Smart Study an accurate picture of your current knowledge level.'),
+            ('fa-chart-pie', 'red', '3', 'Review Risk Insights', 'See which subjects are at risk and why — explained in plain language, not raw numbers.'),
+            ('fa-calendar-alt', 'green', '4', 'Generate Your Study Plan', 'Get a personalised weekly schedule that prioritises the right subjects at the right times.'),
+            ('fa-book-open', 'amber', '5', 'Study & Practice', 'Follow your plan, access study materials, and ask your AI Coach for help when you need it.'),
+            ('fa-chart-line', 'blue', '6', 'Track & Improve', 'Log your sessions, review your progress, and watch your performance improve over time.'),
+        ] %}
+        {% for icon, color, num, title, desc in steps %}
+        <div class="col-md-4">
+            <div class="ss-card h-100">
+                <div class="ss-stat-icon mx-auto mb-3" style="background:rgba({% if color == 'blue' %}56,189,248{% elif color == 'purple' %}168,85,247{% elif color == 'red' %}248,113,113{% elif color == 'green' %}52,211,153{% elif color == 'amber' %}251,191,36{% endif %},0.15);color:var(--{{ color }});">
+                    <i class="fas {{ icon }}"></i>
+                </div>
+                <div class="ss-badge ss-badge-purple mx-auto mb-2" style="font-size:0.7rem;">STEP {{ num }}</div>
+                <h5 class="fw-bold mb-2 text-white">{{ title }}</h5>
+                <p class="text-muted small mb-0">{{ desc }}</p>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</section>
+
+{# ── Final CTA ───────────────────────────────────────────────────────────── #}
+<section class="ss-action text-center py-5 mb-4">
+    <div class="ss-action-content max-w-lg mx-auto">
+        <img src="{{ url_for('static', filename='img/brand/smart-study-mark.svg') }}" alt="Mark" style="width:60px;height:60px;margin-bottom:1rem;">
+        <h2 class="fw-bold text-white mb-3" style="font-size:clamp(1.5rem,3vw,2rem);">Start Your Learning Journey Today</h2>
+        <p class="text-muted mb-4 mx-auto" style="max-width:440px;">
+            Join students who use Smart Study to take control of their academic performance.
+        </p>
+        <a href="{{ url_for('auth.register') }}" class="btn btn-primary px-5 py-3 shadow-lg" style="font-size:1.05rem;font-weight:700;border-radius:12px;">
+            Create Your Free Account <i class="fas fa-arrow-right ms-2"></i>
+        </a>
+    </div>
+</section>
+{% endblock %}
+

@@ -1,0 +1,222 @@
+{% extends 'admin/admin_base.html' %}
+{% block title %}Student Management{% endblock %}
+
+{% block breadcrumb_items %}
+    <span class="active-item">Student Directory</span>
+{% endblock %}
+
+{% block admin_content %}
+<div class="d-flex align-items-center justify-content-between mb-4">
+    <div>
+        <h1 class="h3 fw-bold text-white mb-1"><i class="fas fa-user-graduate me-2 text-primary"></i> Student Directory</h1>
+        <p class="text-muted small mb-0">Browse registered students, academic profiles, risk levels, and account status.</p>
+    </div>
+</div>
+
+<!-- Key Stat Cards Bar -->
+<div class="stat-grid mb-4">
+    <div class="stat-card">
+        <div class="stat-icon"><i class="fas fa-users"></i></div>
+        <div class="stat-label">Total Registered</div>
+        <div class="stat-value">{{ stats.total }}</div>
+        <div class="stat-sub text-muted">All registered student accounts</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon"><i class="fas fa-user-check"></i></div>
+        <div class="stat-label">Active Accounts</div>
+        <div class="stat-value text-success">{{ stats.active }}</div>
+        <div class="stat-sub text-muted">Able to log in & study</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon"><i class="fas fa-id-card"></i></div>
+        <div class="stat-label">Complete Profile</div>
+        <div class="stat-value text-info">{{ stats.complete_profile }}</div>
+        <div class="stat-sub text-muted">Configured study level & country</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon"><i class="fas fa-brain"></i></div>
+        <div class="stat-label">Assessed Students</div>
+        <div class="stat-value text-warning">{{ stats.assessed }}</div>
+        <div class="stat-sub text-muted">Completed diagnostic assessment</div>
+    </div>
+</div>
+
+<!-- Search & Filter Controls -->
+<div class="admin-card p-3 mb-4">
+    <form method="GET" action="{{ url_for('admin.students') }}" class="row g-2 align-items-center">
+        <div class="col-12 col-md-3">
+            <div class="input-group">
+                <span class="input-group-text bg-dark border-secondary text-muted"><i class="fas fa-search"></i></span>
+                <input type="text" name="q" value="{{ search_q }}" class="form-control admin-form-control" placeholder="Search name or email...">
+            </div>
+        </div>
+        
+        <div class="col-6 col-md-2">
+            <select name="level" class="form-select admin-form-control">
+                <option value="">All Education Levels</option>
+                {% for lvl in levels %}
+                <option value="{{ lvl.name }}" {% if selected_level == lvl.name %}selected{% endif %}>{{ lvl.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="col-6 col-md-2">
+            <select name="university" class="form-select admin-form-control">
+                <option value="">All Universities</option>
+                {% for uni in universities %}
+                <option value="{{ uni.name }}" {% if selected_university == uni.name %}selected{% endif %}>{{ uni.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="col-6 col-md-2">
+            <select name="program" class="form-select admin-form-control">
+                <option value="">All Programs</option>
+                {% for prog in programs %}
+                <option value="{{ prog.name }}" {% if selected_program == prog.name %}selected{% endif %}>{{ prog.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="col-6 col-md-2">
+            <select name="status" class="form-select admin-form-control">
+                <option value="">All Statuses</option>
+                <option value="active" {% if selected_status == 'active' %}selected{% endif %}>Active Only</option>
+                <option value="suspended" {% if selected_status == 'suspended' or selected_status == 'inactive' %}selected{% endif %}>Suspended Only</option>
+            </select>
+        </div>
+
+        <div class="col-12 col-md-1 d-flex gap-1">
+            <button type="submit" class="btn btn-admin btn-admin-primary btn-admin-sm w-100 justify-content-center">
+                <i class="fas fa-filter"></i>
+            </button>
+            <a href="{{ url_for('admin.students') }}" class="btn btn-admin btn-admin-secondary btn-admin-sm" title="Clear Filters">
+                <i class="fas fa-rotate-left"></i>
+            </a>
+        </div>
+    </form>
+</div>
+
+<!-- Student Data Table -->
+<div class="admin-table-container">
+    <table class="admin-table">
+        <thead>
+            <tr>
+                <th class="ps-4">Student</th>
+                <th>Academic Level</th>
+                <th>Program & Institution</th>
+                <th>Profile Status</th>
+                <th>Assessment</th>
+                <th>Enrolled Subjects</th>
+                <th>Account Status</th>
+                <th>Registered</th>
+                <th class="pe-4 text-end">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in students %}
+            <tr>
+                <td class="ps-4">
+                    <div class="d-flex align-items-center gap-3">
+                        <div class="sidebar-avatar" style="width:34px; height:34px; font-size:0.85rem; flex-shrink:0;">
+                            {{ (row.user.full_name or row.user.email or 'S')[0].upper() }}
+                        </div>
+                        <div class="min-w-0">
+                            <div class="fw-semibold text-white text-truncate">{{ row.user.full_name or 'Unnamed Student' }}</div>
+                            <div class="small text-muted text-truncate">{{ row.user.email }}</div>
+                        </div>
+                    </div>
+                </td>
+                <td>
+                    {% if row.profile and row.profile.study_level %}
+                        <span class="badge bg-secondary-subtle text-white border border-secondary px-2 py-1">{{ row.profile.study_level }}</span>
+                    {% else %}
+                        <span class="text-dim small">Not configured</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if row.profile %}
+                        <div class="small text-white fw-medium text-truncate" style="max-width: 180px;">{{ row.profile.program or 'No program' }}</div>
+                        <div class="text-dim text-truncate" style="font-size: 0.72rem; max-width: 180px;">{{ row.profile.university or 'No institution' }}</div>
+                    {% else %}
+                        <span class="text-dim small">—</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if row.profile_complete %}
+                        <span class="badge-status active"><i class="fas fa-check"></i> Complete</span>
+                    {% else %}
+                        <span class="badge-status warning"><i class="fas fa-clock"></i> Incomplete</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if row.assessed %}
+                        <span class="badge-status active"><i class="fas fa-brain"></i> Assessed</span>
+                    {% else %}
+                        <span class="badge-status warning"><i class="fas fa-minus"></i> Pending</span>
+                    {% endif %}
+                </td>
+                <td>
+                    <span class="fw-semibold text-white">{{ row.subjects_count }}</span>
+                    <span class="text-dim small">subjects</span>
+                </td>
+                <td>
+                    {% if row.user.is_active %}
+                        <span class="badge-status active"><i class="fas fa-check-circle"></i> Active</span>
+                    {% else %}
+                        <span class="badge-status error"><i class="fas fa-ban"></i> Suspended</span>
+                    {% endif %}
+                </td>
+                <td class="text-muted small">
+                    {{ row.user.date_registered.strftime('%b %d, %Y') if row.user.date_registered else '—' }}
+                </td>
+                <td class="pe-4 text-end">
+                    <div class="d-inline-flex gap-1">
+                        <a href="{{ url_for('admin.student_detail', student_id=row.user.id) }}" class="btn btn-admin btn-admin-secondary btn-admin-sm" title="View Student Detail">
+                            <i class="fas fa-eye"></i> Detail
+                        </a>
+                        <form action="{{ url_for('admin.impersonate', student_id=row.user.id) }}" method="POST" class="d-inline">
+                            <button type="submit" class="btn btn-admin btn-admin-secondary btn-admin-sm text-warning" title="View app as this student">
+                                <i class="fas fa-user-secret"></i>
+                            </button>
+                        </form>
+                    </div>
+                </td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="9" class="text-center py-5 text-muted">
+                    <i class="fas fa-users-slash fs-2 mb-2 d-block text-dim"></i>
+                    No student records found matching the filter criteria.
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<!-- Pagination Controls -->
+{% if pages > 1 %}
+<div class="d-flex justify-content-center mt-4">
+    <nav>
+        <ul class="pagination pagination-sm mb-0">
+            <li class="page-item {% if page == 1 %}disabled{% endif %}">
+                <a class="page-link bg-dark border-secondary text-white" href="{{ url_for('admin.students', page=page-1, q=search_q, level=selected_level, university=selected_university, program=selected_program, status=selected_status) }}">
+                    <i class="fas fa-chevron-left"></i>
+                </a>
+            </li>
+            {% for p in range([1, page-2]|max, [pages+1, page+3]|min) %}
+            <li class="page-item {% if page == p %}active{% endif %}">
+                <a class="page-link {% if page == p %}bg-primary border-primary text-white{% else %}bg-dark border-secondary text-white{% endif %}" href="{{ url_for('admin.students', page=p, q=search_q, level=selected_level, university=selected_university, program=selected_program, status=selected_status) }}">{{ p }}</a>
+            </li>
+            {% endfor %}
+            <li class="page-item {% if page == pages %}disabled{% endif %}">
+                <a class="page-link bg-dark border-secondary text-white" href="{{ url_for('admin.students', page=page+1, q=search_q, level=selected_level, university=selected_university, program=selected_program, status=selected_status) }}">
+                    <i class="fas fa-chevron-right"></i>
+                </a>
+            </li>
+        </ul>
+    </nav>
+</div>
+{% endif %}
+{% endblock %}

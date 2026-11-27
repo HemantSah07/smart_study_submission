@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Smart Study{% endblock %} · Smart Study AI</title>
+    <meta name="description" content="Know what to study, when to study, and how to improve. Smart Study is your AI-powered personal academic coach.">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/smart-study.css') }}?v=2.0.2">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    {% block head %}{% endblock %}
+</head>
+<body class="{% if request.endpoint == 'student.dashboard' %}page-dashboard{% elif request.endpoint == 'student.assistant' %}page-assistant{% elif request.endpoint in ['student.study_material', 'student.study_subject'] %}page-materials{% elif request.endpoint == 'student.predict' %}page-predict{% elif request.endpoint in ['student.planner', 'student.schedule'] %}page-planner{% elif request.endpoint == 'student.study_log' %}page-log{% elif request.endpoint == 'student.future_learning' %}page-future{% elif request.endpoint == 'student.profile' %}page-profile{% elif request.endpoint and 'assessment' in request.endpoint %}page-assessment{% elif not current_user.is_authenticated or (request.endpoint and ('main.' in request.endpoint or 'auth.' in request.endpoint)) %}page-public{% endif %}">
+
+{# ═══════════════════════════════════════════════════════════ #}
+{# PUBLIC NAVBAR (unauthenticated)                            #}
+{# ═══════════════════════════════════════════════════════════ #}
+{% if not current_user.is_authenticated %}
+    <nav class="navbar navbar-expand-lg public-navbar">
+        <div class="container">
+            <a class="navbar-brand py-1" href="{{ url_for('main.home') }}">
+                <img src="{{ url_for('static', filename='img/brand/smart-study-logo-light.svg') }}" alt="Smart Study Logo" style="height: 38px;">
+            </a>
+            <button class="navbar-toggler border-0 text-white" type="button" data-bs-toggle="collapse" data-bs-target="#publicNav" aria-label="Toggle navigation">
+                <i class="fas fa-bars"></i>
+            </button>
+            <div class="collapse navbar-collapse justify-content-center" id="publicNav">
+                <ul class="navbar-nav gap-1">
+                    <li class="nav-item"><a class="nav-link {% if request.endpoint == 'main.home' %}active{% endif %}" href="{{ url_for('main.home') }}"><i class="fas fa-home me-1 text-primary"></i> Home</a></li>
+                    <li class="nav-item"><a class="nav-link {% if request.endpoint == 'main.app_tour' %}active{% endif %}" href="{{ url_for('main.app_tour') }}"><i class="fas fa-compass me-1 text-info"></i> App Tour</a></li>
+                    <li class="nav-item"><a class="nav-link {% if request.endpoint == 'main.about' %}active{% endif %}" href="{{ url_for('main.about') }}"><i class="fas fa-info-circle me-1 text-purple"></i> About</a></li>
+                    <li class="nav-item"><a class="nav-link {% if request.endpoint == 'main.study_tips' %}active{% endif %}" href="{{ url_for('main.study_tips') }}"><i class="fas fa-lightbulb me-1 text-warning"></i> Study Tips</a></li>
+                </ul>
+            </div>
+            <div class="d-flex gap-2 d-none d-lg-flex">
+                <a href="{{ url_for('auth.register') }}" class="btn btn-public-signup shadow-sm"><i class="fas fa-user-plus me-1"></i> Sign Up</a>
+                <a href="{{ url_for('auth.login') }}" class="btn btn-public-login"><i class="fas fa-sign-in-alt me-1"></i> Log In</a>
+            </div>
+            <div class="d-lg-none w-100 mt-3">
+                <a href="{{ url_for('auth.register') }}" class="btn btn-public-signup w-100 mb-2">Sign Up</a>
+                <a href="{{ url_for('auth.login') }}" class="btn btn-public-login w-100">Log In</a>
+            </div>
+        </div>
+    </nav>
+
+{# ═══════════════════════════════════════════════════════════ #}
+{# STUDENT APP SHELL                                          #}
+{# ═══════════════════════════════════════════════════════════ #}
+{% elif current_user.role == 'student' %}
+    <div class="sidebar-overlay" id="sidebarOverlay"></div>
+    <div class="app-shell">
+
+        {# ── Sidebar ─────────────────────────────────────────── #}
+        <aside class="app-sidebar" id="appSidebar" aria-label="Main navigation">
+            {# Brand #}
+            <div class="app-sidebar-brand py-3 px-3">
+                <a href="{{ url_for('student.dashboard') }}" aria-label="Smart Study home" class="d-flex align-items-center">
+                    <img src="{{ url_for('static', filename='img/brand/smart-study-logo-light.svg') }}" alt="Smart Study Logo" class="brand-full" style="height: 36px;">
+                    <img src="{{ url_for('static', filename='img/brand/smart-study-mark.svg') }}" alt="Smart Study Mark" class="brand-mark d-none" style="height: 34px;">
+                </a>
+                <button class="sidebar-collapse-btn" id="sidebarCollapseBtn" aria-label="Collapse sidebar" title="Collapse sidebar">
+                    <i class="fas fa-chevron-left" id="collapseIcon"></i>
+                </button>
+            </div>
+
+            {# Navigation — 5-Part Architecture #}
+            <nav class="app-sidebar-nav" aria-label="Student navigation">
+
+                <!-- 1. WORKSPACE -->
+                <div class="sidebar-cat-label"><i class="fas fa-grip-vertical me-1"></i> Workspace</div>
+                <a class="sidebar-link {% if request.endpoint == 'student.dashboard' %}active{% endif %}"
+                   href="{{ url_for('student.dashboard') }}" aria-current="{% if request.endpoint == 'student.dashboard' %}page{% endif %}">
+                    <i class="fas fa-th-large text-primary"></i>
+                    <span>Overview</span>
+                    <span class="sidebar-tooltip">Overview Dashboard</span>
+                </a>
+                <a class="sidebar-link {% if request.endpoint in ['student.study_material', 'student.document_detail', 'student.uploaded_material_detail'] %}active{% endif %}"
+                   href="{{ url_for('student.study_material') }}">
+                    <i class="fas fa-book-open text-info"></i>
+                    <span>Study Materials</span>
+                    <span class="sidebar-tooltip">Knowledge Library</span>
+                </a>
+
+                <!-- 2. INTELLIGENCE -->
+                <div class="sidebar-cat-label mt-2"><i class="fas fa-brain me-1"></i> Intelligence</div>
+                <a class="sidebar-link {% if request.endpoint == 'student.assistant' %}active{% endif %}"
+                   href="{{ url_for('student.assistant') }}">
+                    <i class="fas fa-robot text-purple"></i>
+                    <span>AI Study Coach</span>
+                    <span class="sidebar-tooltip">Neural AI Assistant</span>
+                </a>
+                <a class="sidebar-link {% if request.endpoint == 'student.predict' %}active{% endif %}"
+                   href="{{ url_for('student.predict') }}">
+                    <i class="fas fa-radar text-cyan"></i>
+                    <span>Risk Insights</span>
+                    <span class="sidebar-tooltip">Academic Risk Radar</span>
+                </a>
+                <a class="sidebar-link {% if request.endpoint and 'assessment' in request.endpoint %}active{% endif %}"
+                   href="{{ url_for('student.assessment_start') }}">
+                    <i class="fas fa-vial text-rose"></i>
+                    <span>Assessments</span>
+                    <span class="sidebar-tooltip">Diagnostic Exam</span>
+                </a>
+
+                <!-- 3. PLANNING -->
+                <div class="sidebar-cat-label mt-2"><i class="fas fa-calendar-check me-1"></i> Planning</div>
+                <a class="sidebar-link planner-link {% if request.endpoint == 'student.schedule' %}active{% endif %}"
+                   href="{{ url_for('student.schedule') }}">
+                    <i class="fas fa-calendar-alt text-emerald"></i>
+                    <span>Study Planner</span>
+                    <span class="sidebar-tooltip">Focus Planning Studio</span>
+                </a>
+
+                <!-- 4. PROGRESS -->
+                <div class="sidebar-cat-label mt-2"><i class="fas fa-chart-line me-1"></i> Progress</div>
+                <a class="sidebar-link {% if request.endpoint == 'student.study_log' %}active{% endif %}"
+                   href="{{ url_for('student.study_log') }}">
+                    <i class="fas fa-stream text-amber"></i>
+                    <span>Study Log</span>
+                    <span class="sidebar-tooltip">Learning Journey</span>
+                </a>
+                <a class="sidebar-link {% if request.endpoint == 'student.future_learning' %}active{% endif %}"
+                   href="{{ url_for('student.future_learning') }}">
+                    <i class="fas fa-rocket text-pink"></i>
+                    <span>Future Learning</span>
+                    <span class="sidebar-tooltip">Career Galaxy</span>
+                </a>
+
+                <!-- 5. ACCOUNT -->
+                <div class="sidebar-cat-label mt-2"><i class="fas fa-user-circle me-1"></i> Account</div>
+                <a class="sidebar-link {% if request.endpoint == 'student.profile' %}active{% endif %}"
+                   href="{{ url_for('student.profile') }}">
+                    <i class="fas fa-id-card text-blue"></i>
+                    <span>My Profile</span>
+                    <span class="sidebar-tooltip">Academic Identity</span>
+                </a>
+
+            </nav>
+
+            {# Footer: user info + logout #}
+            <div class="sidebar-footer">
+                {% set user_profile = current_user.profile %}
+                <a href="{{ url_for('student.profile') }}" class="sidebar-user text-decoration-none d-flex align-items-center gap-2" title="View profile">
+                    <div class="sidebar-avatar" style="padding:0;overflow:hidden;display:flex;align-items:center;justify-content:center;">
+                        {% if user_profile and user_profile.profile_pic %}
+                        <img src="{{ url_for('static', filename=user_profile.profile_pic) }}" alt="Profile picture">
+                        {% else %}
+                        {{ (current_user.full_name or 'S')[0].upper() }}
+                        {% endif %}
+                    </div>
+                    <div class="flex-grow-1 min-w-0">
+                        <div class="fw-bold small text-truncate text-white">{{ current_user.full_name or current_user.email }}</div>
+                        <div class="text-muted" style="font-size:0.72rem;">Student</div>
+                    </div>
+                </a>
+                <a href="{{ url_for('auth.logout') }}" class="sidebar-link mt-2" style="color:#f87171!important;" aria-label="Logout">
+                    <i class="fas fa-sign-out-alt"></i>
+                    <span>Logout</span>
+                    <span class="sidebar-tooltip">Logout</span>
+                </a>
+            </div>
+        </aside>
+
+        {# ── Main content area ────────────────────────────────── #}
+        <div class="app-main" id="appMain">
+
+            {# ── New Structured Topbar ─────────────────────────── #}
+            <header class="ss-topbar" role="banner">
+                <div class="ss-topbar-left">
+                    {# Mobile hamburger #}
+                    <button class="sidebar-toggle" id="sidebarToggle" type="button" aria-label="Open menu">
+                        <i class="fas fa-bars"></i>
+                    </button>
+
+                    {# Breadcrumbs — each page fills this block #}
+                    <nav class="ss-breadcrumb" aria-label="Breadcrumb">
+                        <a href="{{ url_for('student.dashboard') }}"><i class="fas fa-home me-1"></i>Home</a>
+                        {% block breadcrumbs %}{% endblock %}
+                    </nav>
+                </div>
+
+                <div class="ss-topbar-right ss-topbar-actions">
+                    {# Notifications #}
+                    {% set notif_count = unread_notifications|length if unread_notifications is defined else 0 %}
+                    <a href="{{ url_for('student.dashboard') }}#notifications"
+                       title="Notifications{% if notif_count %} ({{ notif_count }} unread){% endif %}"
+                       aria-label="Notifications">
+                        <i class="fas fa-bell"></i>
+                        {% if notif_count > 0 %}
+                        <span class="ss-notif-dot" aria-hidden="true"></span>
+                        {% endif %}
+                    </a>
+
+                    {# AI Coach shortcut #}
+                    <a href="{{ url_for('student.assistant') }}" title="Ask AI Study Coach" aria-label="AI Study Coach" style="color: #a855f7;">
+                        <i class="fas fa-robot"></i>
+                    </a>
+
+                    {# Profile dropdown #}
+                    <div class="dropdown">
+                        <button class="ss-avatar-btn btn dropdown-toggle" type="button"
+                                id="profileDropdown" data-bs-toggle="dropdown" aria-expanded="false"
+                                aria-label="Account menu">
+                            {% set user_profile = current_user.profile %}
+                            {% if user_profile and user_profile.profile_pic %}
+                            <img src="{{ url_for('static', filename=user_profile.profile_pic) }}" alt="Avatar">
+                            {% else %}
+                            {{ (current_user.full_name or 'S')[0].upper() }}
+                            {% endif %}
+                        </button>
+                        <ul class="dropdown-menu ss-profile-dropdown" aria-labelledby="profileDropdown">
+                            <li>
+                                <div class="ss-profile-info">
+                                    <div class="ss-profile-name">{{ current_user.full_name or 'Student' }}</div>
+                                    <div class="ss-profile-role">{{ current_user.email }}</div>
+                                </div>
+                            </li>
+                            <li><a class="dropdown-item" href="{{ url_for('student.profile') }}">
+                                <i class="fas fa-user-circle"></i> View Profile
+                            </a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item text-danger" href="{{ url_for('auth.logout') }}">
+                                <i class="fas fa-sign-out-alt"></i> Logout
+                            </a></li>
+                        </ul>
+                    </div>
+                </div>
+            </header>
+
+            {# Admin impersonation banner #}
+            {% if session.get('impersonating_student_id') %}
+            <div style="background:#78350f;color:#fef3c7;border-bottom:2px solid #f59e0b;padding:8px 16px;display:flex;align-items:center;justify-content:center;gap:12px;font-size:0.88rem;font-weight:600;z-index:1040;position:sticky;top:56px;">
+                <i class="fas fa-user-secret"></i>
+                <span>ADMIN VIEW: You are viewing as student <strong class="text-white">{{ current_user.full_name or current_user.email }}</strong></span>
+                <a href="{{ url_for('admin.exit_impersonate') }}" style="background:#fbbf24;color:#1c1917;padding:3px 12px;border-radius:6px;text-decoration:none;font-weight:700;font-size:0.82rem;">
+                    <i class="fas fa-times-circle me-1"></i> Exit Impersonation
+                </a>
+            </div>
+            {% endif %}
+
+{# ═══════════════════════════════════════════════════════════ #}
+{# ADMIN NAVBAR (admin/super_admin role)                      #}
+{# ═══════════════════════════════════════════════════════════ #}
+{% else %}
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark admin-navbar mb-4 border-bottom border-secondary">
+        <div class="container-fluid px-4">
+            <a class="navbar-brand fw-bold text-gradient" href="{{ url_for('admin.dashboard') }}">
+                <i class="fas fa-cogs me-2 text-primary"></i>
+                <span>Admin Panel</span>
+            </a>
+            <button class="navbar-toggler border-0 text-white" type="button" data-bs-toggle="collapse" data-bs-target="#adminNav" aria-label="Toggle navigation">
+                <i class="fas fa-bars"></i>
+            </button>
+            <div class="collapse navbar-collapse" id="adminNav">
+                <ul class="navbar-nav me-auto mb-2 mb-lg-0 ms-3 gap-1">
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.endpoint == 'admin.dashboard' %}active fw-semibold text-white{% endif %}" href="{{ url_for('admin.dashboard') }}"><i class="fas fa-tachometer-alt me-1 text-primary"></i> Dashboard</a>
+                    </li>
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle {% if 'curriculum' in request.path %}active fw-semibold text-white{% endif %}" href="#" id="curriculumDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="fas fa-atlas me-1 text-primary"></i> Curriculum
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-dark" aria-labelledby="curriculumDropdown">
+                            <li><a class="dropdown-item" href="{{ url_for('admin.curriculum_levels') }}">Education Levels</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('admin.curriculum_universities') }}">Universities</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('admin.curriculum_faculties') }}">Faculties</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('admin.curriculum_programs') }}">Programs</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="{{ url_for('admin.curriculum_subjects') }}">Subjects</a></li>
+                        </ul>
+                    </li>
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle {% if 'content' in request.path %}active fw-semibold text-white{% endif %}" href="#" id="contentDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="fas fa-book-open me-1 text-primary"></i> Content
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-dark" aria-labelledby="contentDropdown">
+                            <li><a class="dropdown-item" href="{{ url_for('admin.content_stats') }}">Overview</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('admin.content_questions') }}">MCQ Questions</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('admin.content_chapters') }}">Chapters</a></li>
+                        </ul>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if 'students' in request.path %}active fw-semibold text-white{% endif %}" href="{{ url_for('admin.students') }}"><i class="fas fa-user-graduate me-1 text-primary"></i> Students</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if 'health' in request.path %}active fw-semibold text-white{% endif %}" href="{{ url_for('admin.health') }}"><i class="fas fa-heartbeat me-1 text-primary"></i> Health</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if 'analytics' in request.path %}active fw-semibold text-white{% endif %}" href="{{ url_for('admin.analytics') }}"><i class="fas fa-chart-bar me-1 text-primary"></i> Analytics</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if 'config' in request.path %}active fw-semibold text-white{% endif %}" href="{{ url_for('admin.config') }}"><i class="fas fa-sliders-h me-1 text-primary"></i> Config</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if 'bulk' in request.path %}active fw-semibold text-white{% endif %}" href="{{ url_for('admin.bulk') }}"><i class="fas fa-layer-group me-1 text-primary"></i> Bulk Ops</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if 'activity-log' in request.path %}active fw-semibold text-white{% endif %}" href="{{ url_for('admin.activity_log') }}"><i class="fas fa-history me-1 text-primary"></i> Logs</a>
+                    </li>
+                </ul>
+                <ul class="navbar-nav ms-auto align-items-center gap-3">
+                    {% if session.get('impersonating_student_id') %}
+                    <li class="nav-item">
+                        <a href="{{ url_for('admin.exit_impersonate') }}" class="btn btn-danger btn-sm text-white fw-bold py-1">
+                            <i class="fas fa-user-slash me-1"></i> Exit Impersonation
+                        </a>
+                    </li>
+                    {% endif %}
+                    <li class="nav-item">
+                        <span class="navbar-text small text-muted">Admin User</span>
+                    </li>
+                    <li class="nav-item">
+                        <a class="btn btn-outline-danger btn-sm py-1" href="{{ url_for('auth.logout') }}">
+                            <i class="fas fa-sign-out-alt"></i> Logout
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+{% endif %}
+
+{# ═══════════════════════════════════════════════════════════ #}
+{# MAIN CONTENT WRAPPER                                       #}
+{# ═══════════════════════════════════════════════════════════ #}
+{% if not current_user.is_authenticated or current_user.role != 'student' %}
+    <div class="container pb-5">
+{% endif %}
+        {% include '_flash.html' %}
+        {% block content %}{% endblock %}
+{% if not current_user.is_authenticated or current_user.role != 'student' %}
+    </div>
+{% elif current_user.role == 'student' %}
+        </div>{# /app-main #}
+    </div>{# /app-shell #}
+
+    {# Floating AI Study Coach Button #}
+    <a href="{{ url_for('student.assistant') }}" class="ss-ai-fab" aria-label="Ask AI Study Coach">
+        <span class="ai-fab-icon"><i class="fas fa-robot"></i></span>
+        <span class="ai-fab-label">AI Study Coach</span>
+    </a>
+
+    {# Mobile Quick Access Bottom Navigation Bar #}
+    <nav class="ss-mobile-bottom-nav" aria-label="Quick mobile navigation">
+        <a href="{{ url_for('student.dashboard') }}" class="ss-mobile-bottom-item {% if request.endpoint == 'student.dashboard' %}active{% endif %}">
+            <i class="fas fa-th-large"></i>
+            <span>Overview</span>
+        </a>
+        <a href="{{ url_for('student.assistant') }}" class="ss-mobile-bottom-item {% if request.endpoint == 'student.assistant' %}active{% endif %}">
+            <i class="fas fa-robot"></i>
+            <span>AI Coach</span>
+        </a>
+        <a href="{{ url_for('student.schedule') }}" class="ss-mobile-bottom-item {% if request.endpoint in ['student.schedule', 'student.planner'] %}active{% endif %}">
+            <i class="fas fa-calendar-alt"></i>
+            <span>Planner</span>
+        </a>
+        <a href="{{ url_for('student.study_material') }}" class="ss-mobile-bottom-item {% if request.endpoint == 'student.study_material' %}active{% endif %}">
+            <i class="fas fa-book-open"></i>
+            <span>Library</span>
+        </a>
+        <a href="{{ url_for('student.profile') }}" class="ss-mobile-bottom-item {% if request.endpoint == 'student.profile' %}active{% endif %}">
+            <i class="fas fa-id-card"></i>
+            <span>Profile</span>
+        </a>
+    </nav>
+{% endif %}
+
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script src="{{ url_for('static', filename='js/state-manager.js') }}"></script>
+<script src="{{ url_for('static', filename='js/smart-study.js') }}?v=2.0.1"></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

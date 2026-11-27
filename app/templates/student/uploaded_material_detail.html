@@ -1,0 +1,917 @@
+{% extends 'base.html' %}
+{% block title %}Study: {{ material.filename }}{% endblock %}
+
+{% block content %}
+<style>
+    .detail-panel {
+        max-height: calc(100vh - 120px);
+        overflow-y: auto;
+    }
+    .chat-box {
+        background: rgba(0, 0, 0, 0.2);
+        border: 1px solid rgba(255, 255, 255, 0.05);
+        border-radius: var(--radius-md);
+        height: 350px;
+        overflow-y: auto;
+        padding: 1rem;
+    }
+    .chat-bubble-user {
+        background: var(--neon-blue);
+        color: white;
+        border-radius: 12px 12px 0 12px;
+        padding: 8px 14px;
+        max-width: 80%;
+        align-self: flex-end;
+    }
+    .chat-bubble-tutor {
+        background: rgba(255, 255, 255, 0.05);
+        color: #f1f5f9;
+        border-radius: 12px 12px 12px 0;
+        padding: 8px 14px;
+        max-width: 80%;
+        align-self: flex-start;
+        border: 1px solid rgba(255, 255, 255, 0.02);
+    }
+    .study-tab-btn {
+        padding: 8px 20px;
+        font-weight: 600;
+        font-size: 14px;
+        border-radius: 6px;
+        border: 1px solid rgba(255,255,255,0.05);
+        background: rgba(255,255,255,0.02);
+        color: #94a3b8;
+        transition: all 0.2s ease;
+    }
+    .study-tab-btn:hover {
+        background: rgba(255,255,255,0.05);
+        color: white;
+    }
+    .study-tab-btn.active {
+        background: var(--neon-purple);
+        color: white;
+        border-color: transparent;
+        box-shadow: 0 4px 10px rgba(168, 85, 247, 0.2);
+    }
+    
+    /* Interactive Flashcard */
+    .flashcard-box {
+        perspective: 1000px;
+        width: 100%;
+        max-width: 500px;
+        height: 250px;
+        cursor: pointer;
+        margin: 0 auto;
+    }
+    .flashcard-inner {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        text-align: center;
+        transition: transform 0.6s;
+        transform-style: preserve-3d;
+    }
+    .flashcard-box.flipped .flashcard-inner {
+        transform: rotateY(180deg);
+    }
+    .flashcard-front, .flashcard-back {
+        position: absolute;
+        width: 100%;
+        height: 100%;
+        -webkit-backface-visibility: hidden;
+        backface-visibility: hidden;
+        border-radius: 12px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        padding: 30px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+    }
+    .flashcard-front {
+        background: linear-gradient(135deg, rgba(30, 41, 59, 0.95), rgba(15, 23, 42, 0.95));
+        color: white;
+    }
+    .flashcard-back {
+        background: linear-gradient(135deg, rgba(76, 29, 149, 0.95), rgba(15, 23, 42, 0.95));
+        color: white;
+        transform: rotateY(180deg);
+    }
+    
+    /* MCQs options */
+    .mcq-option-btn {
+        width: 100%;
+        text-align: left;
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 8px;
+        padding: 0.75rem 1rem;
+        color: white;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+    .mcq-option-btn:hover:not(:disabled) {
+        background: rgba(255, 255, 255, 0.08);
+        border-color: var(--neon-blue);
+    }
+    .mcq-option-btn.correct {
+        background: rgba(16, 185, 129, 0.15) !important;
+        border-color: #10b981 !important;
+        color: #34d399 !important;
+        font-weight: 600;
+    }
+    .mcq-option-btn.incorrect {
+        background: rgba(239, 68, 68, 0.15) !important;
+        border-color: #ef4444 !important;
+        color: #fca5a5 !important;
+    }
+
+    /* CSS Text Contrast Overrides & High Visibility Rules */
+    .docx-preview-container, .document-rich-text-viewer, #formatted-markdown-viewer {
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        font-size: 0.98rem;
+        line-height: 1.75;
+        transition: all 0.3s ease;
+    }
+
+    /* Clean Paper Mode (Default Authentic Printed Document Styling) */
+    .docx-preview-container.paper-mode,
+    .document-rich-text-viewer.paper-mode,
+    #formatted-markdown-viewer.paper-mode {
+        background-color: #ffffff !important;
+        color: #0f172a !important;
+        padding: 2.5rem !important;
+        border-radius: 12px !important;
+        border: 1px solid #cbd5e1 !important;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.25) !important;
+    }
+    .docx-preview-container.paper-mode p,
+    .docx-preview-container.paper-mode span,
+    .docx-preview-container.paper-mode li,
+    .docx-preview-container.paper-mode td,
+    .docx-preview-container.paper-mode th,
+    .docx-preview-container.paper-mode div,
+    .docx-preview-container.paper-mode strong,
+    .docx-preview-container.paper-mode em,
+    .document-rich-text-viewer.paper-mode p,
+    .document-rich-text-viewer.paper-mode span,
+    .document-rich-text-viewer.paper-mode div,
+    #formatted-markdown-viewer.paper-mode p,
+    #formatted-markdown-viewer.paper-mode span,
+    #formatted-markdown-viewer.paper-mode td,
+    #formatted-markdown-viewer.paper-mode th {
+        color: #0f172a !important;
+    }
+    .docx-preview-container.paper-mode h1,
+    .docx-preview-container.paper-mode h2,
+    .docx-preview-container.paper-mode h3,
+    .docx-preview-container.paper-mode h4,
+    .docx-preview-container.paper-mode h5,
+    .docx-preview-container.paper-mode h6,
+    .document-rich-text-viewer.paper-mode h1,
+    .document-rich-text-viewer.paper-mode h2,
+    .document-rich-text-viewer.paper-mode h3,
+    #formatted-markdown-viewer.paper-mode h1,
+    #formatted-markdown-viewer.paper-mode h2,
+    #formatted-markdown-viewer.paper-mode h3 {
+        color: #4c1d95 !important;
+        font-weight: 700;
+    }
+    .docx-preview-container.paper-mode table,
+    #formatted-markdown-viewer.paper-mode table {
+        width: 100% !important;
+        margin: 1.5rem 0 !important;
+        border-collapse: collapse !important;
+        background: #ffffff !important;
+        border: 1px solid #cbd5e1 !important;
+        border-radius: 8px !important;
+    }
+    .docx-preview-container.paper-mode th,
+    .docx-preview-container.paper-mode td,
+    #formatted-markdown-viewer.paper-mode th,
+    #formatted-markdown-viewer.paper-mode td {
+        border: 1px solid #cbd5e1 !important;
+        padding: 10px 14px !important;
+        color: #0f172a !important;
+    }
+    .docx-preview-container.paper-mode th,
+    #formatted-markdown-viewer.paper-mode th {
+        background-color: #f1f5f9 !important;
+        color: #0f172a !important;
+        font-weight: 700 !important;
+    }
+    .docx-preview-container.paper-mode tr:nth-child(even),
+    #formatted-markdown-viewer.paper-mode tr:nth-child(even) {
+        background-color: #f8fafc !important;
+    }
+    .docx-preview-container.paper-mode code,
+    .docx-preview-container.paper-mode pre,
+    .document-rich-text-viewer.paper-mode code,
+    .document-rich-text-viewer.paper-mode pre,
+    #formatted-markdown-viewer.paper-mode code,
+    #formatted-markdown-viewer.paper-mode pre {
+        background-color: #f1f5f9 !important;
+        color: #0284c7 !important;
+        padding: 2px 6px;
+        border-radius: 4px;
+        font-family: SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+
+    /* Dark Slate Mode (High-Contrast Dark View Option) */
+    .docx-preview-container.dark-slate-mode,
+    .document-rich-text-viewer.dark-slate-mode,
+    #formatted-markdown-viewer.dark-slate-mode {
+        background-color: #0f172a !important;
+        color: #f8fafc !important;
+        border: 1px solid rgba(255, 255, 255, 0.12) !important;
+        border-radius: 12px !important;
+        padding: 2rem !important;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3) !important;
+    }
+    .docx-preview-container.dark-slate-mode p,
+    .docx-preview-container.dark-slate-mode span,
+    .docx-preview-container.dark-slate-mode li,
+    .docx-preview-container.dark-slate-mode td,
+    .docx-preview-container.dark-slate-mode div,
+    .docx-preview-container.dark-slate-mode strong,
+    .docx-preview-container.dark-slate-mode em,
+    .document-rich-text-viewer.dark-slate-mode p,
+    .document-rich-text-viewer.dark-slate-mode span,
+    .document-rich-text-viewer.dark-slate-mode div,
+    #formatted-markdown-viewer.dark-slate-mode p,
+    #formatted-markdown-viewer.dark-slate-mode span,
+    #formatted-markdown-viewer.dark-slate-mode td {
+        color: #f8fafc !important;
+    }
+    .docx-preview-container.dark-slate-mode h1,
+    .docx-preview-container.dark-slate-mode h2,
+    .docx-preview-container.dark-slate-mode h3,
+    .docx-preview-container.dark-slate-mode h4,
+    .docx-preview-container.dark-slate-mode h5,
+    .docx-preview-container.dark-slate-mode h6,
+    .document-rich-text-viewer.dark-slate-mode h1,
+    .document-rich-text-viewer.dark-slate-mode h2,
+    .document-rich-text-viewer.dark-slate-mode h3,
+    #formatted-markdown-viewer.dark-slate-mode h1,
+    #formatted-markdown-viewer.dark-slate-mode h2,
+    #formatted-markdown-viewer.dark-slate-mode h3 {
+        color: #c084fc !important;
+        font-weight: 700;
+    }
+    .docx-preview-container.dark-slate-mode table,
+    #formatted-markdown-viewer.dark-slate-mode table {
+        width: 100% !important;
+        margin: 1.5rem 0 !important;
+        border-collapse: collapse !important;
+        background: rgba(255, 255, 255, 0.02) !important;
+        border-radius: 8px !important;
+        overflow: hidden !important;
+        border: 1px solid rgba(255, 255, 255, 0.15) !important;
+    }
+    .docx-preview-container.dark-slate-mode th,
+    .docx-preview-container.dark-slate-mode td,
+    #formatted-markdown-viewer.dark-slate-mode th,
+    #formatted-markdown-viewer.dark-slate-mode td {
+        border: 1px solid rgba(255, 255, 255, 0.15) !important;
+        padding: 10px 14px !important;
+    }
+    .docx-preview-container.dark-slate-mode th,
+    #formatted-markdown-viewer.dark-slate-mode th {
+        background: rgba(124, 58, 237, 0.3) !important;
+        color: #e9d5ff !important;
+        font-weight: 700 !important;
+    }
+    .docx-preview-container.dark-slate-mode tr:nth-child(even),
+    #formatted-markdown-viewer.dark-slate-mode tr:nth-child(even) {
+        background: rgba(255, 255, 255, 0.04) !important;
+    }
+    .docx-preview-container.dark-slate-mode code,
+    .docx-preview-container.dark-slate-mode pre,
+    .document-rich-text-viewer.dark-slate-mode code,
+    .document-rich-text-viewer.dark-slate-mode pre,
+    #formatted-markdown-viewer.dark-slate-mode code,
+    #formatted-markdown-viewer.dark-slate-mode pre {
+        background: #1e293b !important;
+        color: #38bdf8 !important;
+        padding: 2px 6px;
+        border-radius: 4px;
+        font-family: SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+
+    /* PowerPoint Slide Cards */
+    .slide-card {
+        border: 1px solid rgba(255, 255, 255, 0.12) !important;
+        border-radius: 10px !important;
+        background: rgba(15, 23, 42, 0.85) !important;
+        box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+    }
+    .slide-card-header {
+        background: rgba(124, 58, 237, 0.15) !important;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
+        color: #a78bfa !important;
+        font-weight: 700;
+        padding: 12px 20px;
+    }
+</style>
+
+<div class="row stagger-1">
+    <div class="col-12 mb-3">
+        <a href="{{ url_for('student.study_material') }}" class="text-decoration-none text-muted small"><i class="fas fa-chevron-left me-1"></i> Back to Library</a>
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mt-2">
+            <div>
+                <h2 class="fw-bold text-gradient mb-0">{{ material.filename }}</h2>
+                <p class="text-muted small mb-0"><i class="fas fa-book me-1"></i> {{ subject.name }}</p>
+            </div>
+            <div class="d-flex align-items-center gap-2">
+                <a href="{{ url_for('student.download_raw_material', material_id=material.id) }}" class="btn btn-outline-light btn-sm fw-bold shadow-sm" title="Download Intact Original File">
+                    <i class="fas fa-download me-1 text-primary"></i> Download Original
+                </a>
+                <span class="badge bg-success bg-opacity-20 text-success py-2 px-3"><i class="fas fa-cloud-upload-alt me-1"></i> Custom Document</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row stagger-2">
+    <div class="col-12 detail-panel py-2">
+        <!-- Interactive Tabs -->
+        <div class="d-flex flex-wrap gap-2 mb-4" id="study-tabs">
+            <button class="study-tab-btn active" onclick="switchStudyTab('summary')"><i class="fas fa-file-alt me-2"></i> Summary & Notes</button>
+            <button class="study-tab-btn" onclick="switchStudyTab('mcq')"><i class="fas fa-clipboard-check me-2"></i> Practice MCQs</button>
+            <button class="study-tab-btn" onclick="switchStudyTab('flashcards')"><i class="fas fa-clone me-2"></i> Flashcards</button>
+            <button class="study-tab-btn" onclick="switchStudyTab('chat')"><i class="fas fa-comment-dots me-2"></i> Document Q&amp;A Chat</button>
+            <button class="study-tab-btn" onclick="switchStudyTab('text')"><i class="fas fa-eye me-2"></i> Document Preview &amp; Content</button>
+        </div>
+
+        <!-- TAB Content: Summary & Notes -->
+        <div id="tab-summary" class="tab-content-item">
+            {% if material.summary and material.summary != 'None' %}
+            <div class="row g-4">
+                <div class="col-lg-8">
+                    <div class="card card-light p-4">
+                        <h4 class="fw-bold text-gradient mb-3"><i class="fas fa-bookmark me-2 text-primary"></i> Executive Summary</h4>
+                        <div class="text-white" id="summary-text-box">{{ material.summary|safe }}</div>
+                    </div>
+                </div>
+                <div class="col-lg-4">
+                    <div class="card card-light p-4">
+                        <h5 class="fw-bold text-gradient mb-3"><i class="fas fa-list-ul me-2 text-warning"></i> Key Revision Notes</h5>
+                        <div class="text-white" id="notes-text-box">{{ material.revision_notes|safe if material.revision_notes else 'Structured key notes compiled from document.' }}</div>
+                    </div>
+                </div>
+            </div>
+            {% else %}
+            <div class="card card-light p-5 text-center" id="no-summary-card">
+                <div class="mb-3 text-warning">
+                    <i class="fas fa-sparkles fa-3x animate-bounce"></i>
+                </div>
+                <h4 class="fw-bold text-white mb-2">No Summary Generated Yet</h4>
+                <p class="text-muted small max-w-md mx-auto mb-4">Click below to trigger AI analysis and extract executive summaries and bullet points directly from this document.</p>
+                <button type="button" onclick="generateSummaryAjax({{ material.id }})" class="btn btn-primary btn-lg mx-auto fw-bold px-4" id="btn-gen-summary">
+                    <i class="fas fa-magic me-2"></i> ✨ Generate Summary &amp; Key Notes
+                </button>
+            </div>
+            <div class="row g-4 d-none" id="generated-summary-row">
+                <div class="col-12">
+                    <div class="card card-light p-4">
+                        <h4 class="fw-bold text-gradient mb-3"><i class="fas fa-bookmark me-2 text-primary"></i> Executive Summary &amp; Notes</h4>
+                        <div class="text-white" id="summary-text-box-async"></div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- TAB Content: MCQs -->
+        <div id="tab-mcq" class="tab-content-item d-none">
+            <div class="card card-light p-4">
+                <h4 class="fw-bold text-gradient mb-2"><i class="fas fa-brain me-2"></i> Document practice Quiz</h4>
+                <p class="text-muted small mb-4">Practice questions generated directly from your uploaded document.</p>
+                <div id="mcq-loading" class="text-center py-5 d-none">
+                    <div class="spinner-grow text-primary" role="status"></div>
+                    <p class="text-muted small mt-2">Drafting practice questions from context...</p>
+                </div>
+                <div id="mcq-container"></div>
+            </div>
+        </div>
+
+        <!-- TAB Content: Flashcards -->
+        <div id="tab-flashcards" class="tab-content-item d-none">
+            <div class="card card-light p-4 text-center">
+                <h4 class="fw-bold text-gradient mb-2"><i class="fas fa-bolt me-2"></i> Document Flashcards</h4>
+                <p class="text-muted small mb-4">Click to flip the card and reveal the answer.</p>
+                
+                <div id="fc-loading" class="text-center py-5 d-none">
+                    <div class="spinner-grow text-purple" role="status"></div>
+                    <p class="text-muted small mt-2">Creating flashcards for active recall...</p>
+                </div>
+
+                <div id="fc-content" class="d-none">
+                    <div class="flashcard-box mb-4" id="flashcard" onclick="this.classList.toggle('flipped')">
+                        <div class="flashcard-inner">
+                            <div class="flashcard-front">
+                                <span class="badge bg-secondary mb-3">Front</span>
+                                <h4 class="fw-bold" id="fc-front-text">Question</h4>
+                            </div>
+                            <div class="flashcard-back">
+                                <span class="badge bg-purple mb-3">Back</span>
+                                <p class="fs-5" id="fc-back-text">Answer</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="d-flex justify-content-center gap-3">
+                        <button class="btn btn-outline-secondary btn-sm" onclick="prevFlashcard()"><i class="fas fa-chevron-left me-1"></i> Prev</button>
+                        <span class="text-muted px-2 align-self-center" id="fc-tracker">1 / 5</span>
+                        <button class="btn btn-outline-secondary btn-sm" onclick="nextFlashcard()">Next <i class="fas fa-chevron-right ms-1"></i></button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB Content: Chat Q&A -->
+        <div id="tab-chat" class="tab-content-item d-none">
+            <div class="card card-light p-4">
+                <h4 class="fw-bold text-gradient mb-2"><i class="fas fa-robot me-2"></i> AI Document Tutor</h4>
+                <p class="text-muted small mb-3">Ask questions, request explanations, or seek deep dives regarding the uploaded content.</p>
+                
+                <div class="chat-box d-flex flex-column gap-2 mb-3" id="chatHistory">
+                    <div class="chat-bubble-tutor">Hello! I have reviewed your uploaded document. Feel free to ask me anything about it!</div>
+                </div>
+                
+                <form id="tutorChatForm" onsubmit="sendChatQuery(event)">
+                    <div class="input-group">
+                        <input type="text" id="chatInput" class="form-control bg-dark border-secondary text-white" placeholder="Ask a question about this document..." required autocomplete="off">
+                        <button type="submit" class="btn btn-primary" id="btnSendChat"><i class="fas fa-paper-plane"></i></button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- TAB Content: Document Preview & Content -->
+        <div id="tab-text" class="tab-content-item d-none">
+            <div class="card card-light p-4">
+                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4 border-bottom border-secondary pb-3">
+                    <h4 class="fw-bold text-gradient mb-0"><i class="fas fa-eye me-2 text-primary"></i> Document View &amp; Extracted Content</h4>
+                    <ul class="nav nav-pills" id="docSubTabs" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active btn-sm px-3 me-2" id="subtab-preview-tab" data-bs-toggle="pill" data-bs-target="#subtab-preview" type="button" role="tab"><i class="fas fa-file-invoice me-1"></i> Visual Previewer</button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link btn-sm px-3" id="subtab-text-tab" data-bs-toggle="pill" data-bs-target="#subtab-text" type="button" role="tab"><i class="fas fa-code me-1"></i> Formatted Text &amp; Tables</button>
+                        </li>
+                    </ul>
+                </div>
+
+                <div class="tab-content" id="docSubTabsContent">
+                    <!-- SUB-TAB 1: Visual Previewer -->
+                    <div class="tab-pane fade show active" id="subtab-preview" role="tabpanel">
+                        {% if file_ext == 'pdf' %}
+                        <div class="mb-3 d-flex justify-content-between align-items-center bg-dark p-2 px-3 rounded border border-secondary">
+                            <span class="text-white small fw-bold"><i class="fas fa-file-pdf me-2 text-danger"></i> PDF Native Document Viewer</span>
+                            <a href="{{ url_for('student.download_raw_material', material_id=material.id) }}" class="btn btn-outline-primary btn-sm"><i class="fas fa-external-link-alt me-1"></i> Download PDF</a>
+                        </div>
+                        <iframe src="{{ url_for('student.preview_raw_material', material_id=material.id) }}" width="100%" height="650px" style="border: 1px solid rgba(255,255,255,0.15); border-radius: 10px;" class="shadow-sm"></iframe>
+
+                        {% elif file_ext == 'docx' %}
+                        <div class="mb-3 d-flex justify-content-between align-items-center bg-dark p-2 px-3 rounded border border-secondary flex-wrap gap-2">
+                            <span class="text-white small fw-bold"><i class="fas fa-file-word me-2 text-primary"></i> Formatted Word Document HTML Render</span>
+                            <div class="d-flex align-items-center gap-2">
+                                <button class="btn btn-outline-light btn-sm fw-bold shadow-sm" type="button" onclick="toggleDocViewerTheme()" id="btn-doc-theme-toggle">
+                                    <i class="fas fa-moon me-1 text-info"></i> 🌙 Dark Slate Mode
+                                </button>
+                                <span class="badge bg-purple bg-opacity-20 text-purple py-2 px-3">Mammoth HTML + Tables</span>
+                            </div>
+                        </div>
+                        {% if docx_html %}
+                        <div class="docx-preview-container paper-mode p-4 rounded border border-secondary shadow-sm" style="max-height: 650px; overflow-y: auto;">
+                            {{ docx_html|safe }}
+                        </div>
+                        {% else %}
+                        <div class="p-4 bg-dark rounded border border-secondary text-muted">
+                            <p class="mb-0">Word document HTML preview unavailable. Switch to Formatted Text &amp; Tables tab.</p>
+                        </div>
+                        {% endif %}
+
+                        {% elif file_ext == 'pptx' %}
+                        <div class="mb-3 d-flex justify-content-between align-items-center bg-dark p-2 px-3 rounded border border-secondary">
+                            <span class="text-white small fw-bold"><i class="fas fa-file-powerpoint me-2 text-warning"></i> PowerPoint Presentation Slide Deck</span>
+                            <span class="badge bg-warning bg-opacity-20 text-warning py-2 px-3">Structured Slide Cards</span>
+                        </div>
+                        <div id="pptx-slide-cards-container" class="d-flex flex-column gap-3" style="max-height: 650px; overflow-y: auto;">
+                            <!-- Populated via JS -->
+                        </div>
+
+                        {% else %}
+                        <div class="p-4 rounded border border-secondary shadow-sm">
+                            <h5 class="fw-bold mb-3 text-gradient"><i class="fas fa-file-alt me-2 text-info"></i> {{ material.filename }}</h5>
+                            <div class="document-rich-text-viewer paper-mode" style="white-space: pre-wrap; font-size: 0.95rem; line-height: 1.7; max-height: 550px; overflow-y: auto;">
+                                {{ material.extracted_text if material.extracted_text else 'No text content extracted.' }}
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+
+                    <!-- SUB-TAB 2: Formatted Text & Structured Markdown -->
+                    <div class="tab-pane fade" id="subtab-text" role="tabpanel">
+                        <div class="p-2">
+                            <div class="mb-3 d-flex justify-content-end">
+                                <button class="btn btn-outline-light btn-sm fw-bold shadow-sm" type="button" onclick="toggleDocViewerTheme()" id="btn-doc-theme-toggle-text">
+                                    <i class="fas fa-moon me-1 text-info"></i> 🌙 Dark Slate Mode
+                                </button>
+                            </div>
+                            <div class="p-4 border rounded border-secondary paper-mode shadow-sm" style="font-size: 0.95rem; line-height: 1.7; max-height: 600px; overflow-y: auto;" id="formatted-markdown-viewer">
+                                {{ material.extracted_text if material.extracted_text else 'No extracted text available.' }}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const materialId = "{{ material.id }}";
+    let activeTab = 'summary';
+    
+    // Flashcard local states
+    let flashcards = [];
+    let currentFcIndex = 0;
+    
+    function switchStudyTab(tab) {
+        document.querySelectorAll(".study-tab-btn").forEach(btn => btn.classList.remove("active"));
+        document.querySelectorAll(".tab-content-item").forEach(item => item.classList.add("d-none"));
+        
+        event.currentTarget.classList.add("active");
+        document.getElementById("tab-" + tab).classList.remove("d-none");
+        
+        activeTab = tab;
+        
+        // Trigger lazy loading
+        if (tab === 'mcq') {
+            loadMCQs();
+        } else if (tab === 'flashcards') {
+            loadFlashcards();
+        } else if (tab === 'text') {
+            renderPPTXSlides();
+            renderFormattedMarkdown();
+        }
+    }
+
+    // Lazy load MCQs
+    function loadMCQs() {
+        const container = document.getElementById("mcq-container");
+        if (container.children.length > 0) return; // already loaded
+        
+        const loader = document.getElementById("mcq-loading");
+        loader.classList.remove("d-none");
+        
+        fetch(`/student/study-material/uploaded/${materialId}/ai-action`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ action: "mcqs" })
+        })
+        .then(res => res.json())
+        .then(data => {
+            loader.classList.add("d-none");
+            if (data.status === "success" && data.mcqs.length > 0) {
+                let html = "";
+                data.mcqs.forEach((q, idx) => {
+                    html += `
+                        <div class="mb-4 p-3 rounded text-start" style="background: rgba(255,255,255,0.01); border: 1px solid rgba(255,255,255,0.04);">
+                            <h6 class="fw-bold text-white mb-2">Q${idx+1}: ${q.q}</h6>
+                            <div class="d-flex flex-column gap-2">
+                                <button class="mcq-option-btn text-start" onclick="checkAnswer(this, 'A', '${q.ans}', '${q.exp.replace(/'/g, "\\'")}')"><strong>A.</strong> ${q.a}</button>
+                                <button class="mcq-option-btn text-start" onclick="checkAnswer(this, 'B', '${q.ans}', '${q.exp.replace(/'/g, "\\'")}')"><strong>B.</strong> ${q.b}</button>
+                                <button class="mcq-option-btn text-start" onclick="checkAnswer(this, 'C', '${q.ans}', '${q.exp.replace(/'/g, "\\'")}')"><strong>C.</strong> ${q.c}</button>
+                                <button class="mcq-option-btn text-start" onclick="checkAnswer(this, 'D', '${q.ans}', '${q.exp.replace(/'/g, "\\'")}')"><strong>D.</strong> ${q.d}</button>
+                            </div>
+                            <div class="d-none mt-3 p-3 rounded bg-info bg-opacity-10 text-white small" id="mcq-exp-${idx}"></div>
+                        </div>
+                    `;
+                });
+                container.innerHTML = html;
+            } else {
+                container.innerHTML = `<div class="alert alert-danger">Failed to generate practice quiz.</div>`;
+            }
+        })
+        .catch(err => {
+            loader.classList.add("d-none");
+            container.innerHTML = `<div class="alert alert-danger">Error: ${err}</div>`;
+        });
+    }
+
+    function checkAnswer(btn, selectedOption, correctOption, explanation) {
+        const parent = btn.parentElement;
+        const buttons = parent.querySelectorAll(".mcq-option-btn");
+        
+        buttons.forEach(b => {
+            b.disabled = true;
+            if (b.innerText.startsWith(correctOption)) {
+                b.classList.add("correct");
+            }
+        });
+        
+        if (selectedOption !== correctOption) {
+            btn.classList.add("incorrect");
+        }
+        
+        // Show explanation
+        const containerDiv = parent.parentElement;
+        const expBox = containerDiv.querySelector("[id^='mcq-exp-']");
+        if (expBox) {
+            expBox.classList.remove("d-none");
+            expBox.innerHTML = `<strong>Explanation:</strong> ${explanation}`;
+        }
+    }
+
+    // Lazy load Flashcards
+    function loadFlashcards() {
+        if (flashcards.length > 0) return; // already loaded
+        
+        const loader = document.getElementById("fc-loading");
+        const content = document.getElementById("fc-content");
+        
+        loader.classList.remove("d-none");
+        content.classList.add("d-none");
+        
+        fetch(`/student/study-material/uploaded/${materialId}/ai-action`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ action: "flashcards" })
+        })
+        .then(res => res.json())
+        .then(data => {
+            loader.classList.add("d-none");
+            if (data.status === "success" && data.flashcards.length > 0) {
+                flashcards = data.flashcards;
+                currentFcIndex = 0;
+                content.classList.remove("d-none");
+                renderFlashcard();
+            } else {
+                loader.outerHTML = `<div class="alert alert-danger">Failed to generate flashcards.</div>`;
+            }
+        })
+        .catch(err => {
+            loader.classList.add("d-none");
+            loader.outerHTML = `<div class="alert alert-danger">Error: ${err}</div>`;
+        });
+    }
+
+    function generateSummaryAjax(matId) {
+        const btn = document.getElementById("btn-gen-summary");
+        if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span> Analyzing & Extracting Notes...';
+        }
+        fetch(`/student/study-material/${matId}/generate-summary`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" }
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.status === "success") {
+                const card = document.getElementById("no-summary-card");
+                const row = document.getElementById("generated-summary-row");
+                const box = document.getElementById("summary-text-box-async");
+                if (card) card.classList.add("d-none");
+                if (box) box.innerHTML = data.summary.replace(/\n/g, "<br>");
+                if (row) row.classList.remove("d-none");
+            } else {
+                alert("Notice: " + (data.message || "Unable to generate summary."));
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fas fa-magic me-2"></i> ✨ Try Again';
+                }
+            }
+        })
+        .catch(err => {
+            alert("Error: " + err);
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-magic me-2"></i> ✨ Try Again';
+            }
+        });
+    }
+
+    function renderFlashcard() {
+        if (flashcards.length === 0) return;
+        const card = flashcards[currentFcIndex];
+        
+        document.getElementById("flashcard").classList.remove("flipped");
+        document.getElementById("fc-front-text").innerText = card.front;
+        document.getElementById("fc-back-text").innerText = card.back;
+        document.getElementById("fc-tracker").innerText = `${currentFcIndex + 1} / ${flashcards.length}`;
+    }
+
+    function nextFlashcard() {
+        if (flashcards.length === 0) return;
+        currentFcIndex = (currentFcIndex + 1) % flashcards.length;
+        renderFlashcard();
+    }
+
+    function prevFlashcard() {
+        if (flashcards.length === 0) return;
+        currentFcIndex = (currentFcIndex - 1 + flashcards.length) % flashcards.length;
+        renderFlashcard();
+    }
+
+    // Chat function
+    function sendChatQuery(e) {
+        e.preventDefault();
+        
+        const input = document.getElementById("chatInput");
+        const query = input.value.trim();
+        if (!query) return;
+        
+        const history = document.getElementById("chatHistory");
+        const btnSend = document.getElementById("btnSendChat");
+        
+        // Append user bubble
+        const userBubble = document.createElement("div");
+        userBubble.className = "chat-bubble-user align-self-end mt-2";
+        userBubble.innerText = query;
+        history.appendChild(userBubble);
+        
+        input.value = "";
+        btnSend.disabled = true;
+        
+        // Auto scroll
+        history.scrollTop = history.scrollHeight;
+        
+        fetch(`/student/study-material/uploaded/${materialId}/ai-action`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ action: "chat", query: query })
+        })
+        .then(res => res.json())
+        .then(data => {
+            btnSend.disabled = false;
+            if (data.status === "success") {
+                const tutorBubble = document.createElement("div");
+                tutorBubble.className = "chat-bubble-tutor align-self-start mt-2";
+                tutorBubble.innerHTML = data.response.replace(/\n/g, "<br>");
+                history.appendChild(tutorBubble);
+            } else {
+                const errorBubble = document.createElement("div");
+                errorBubble.className = "chat-bubble-tutor align-self-start mt-2 text-danger";
+                errorBubble.innerText = "Error: " + data.message;
+                history.appendChild(errorBubble);
+            }
+            history.scrollTop = history.scrollHeight;
+        })
+        .catch(err => {
+            btnSend.disabled = false;
+            const errorBubble = document.createElement("div");
+            errorBubble.className = "chat-bubble-tutor align-self-start mt-2 text-danger";
+            errorBubble.innerText = "Error communicating with service.";
+            history.appendChild(errorBubble);
+            history.scrollTop = history.scrollHeight;
+        });
+    }
+
+    function escapeHtml(text) {
+        if (!text) return "";
+        return text
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
+    }
+
+    function renderPPTXSlides() {
+        const container = document.getElementById("pptx-slide-cards-container");
+        if (!container) return;
+
+        const rawText = {{ material.extracted_text|tojson if material.extracted_text else '""' }};
+        if (!rawText || !rawText.trim()) {
+            container.innerHTML = `<div class="p-4 text-muted bg-dark rounded border border-secondary">No presentation slide content available.</div>`;
+            return;
+        }
+
+        const slideMarkerRegex = /--- Slide (\d+) ---/g;
+        const parts = rawText.split(slideMarkerRegex);
+
+        if (parts.length <= 1) {
+            const blocks = rawText.split("\n\n").filter(b => b.trim().length > 0);
+            let html = "";
+            blocks.forEach((b, idx) => {
+                html += `
+                    <div class="card slide-card">
+                        <div class="slide-card-header d-flex align-items-center justify-content-between">
+                            <span><i class="fas fa-file-powerpoint me-2 text-warning"></i> Slide ${idx + 1}</span>
+                            <span class="badge bg-dark text-muted">Slide Card</span>
+                        </div>
+                        <div class="card-body p-4 text-white">
+                            <div style="white-space: pre-wrap; font-size: 0.95rem; line-height: 1.6;">${escapeHtml(b.trim())}</div>
+                        </div>
+                    </div>
+                `;
+            });
+            container.innerHTML = html;
+            return;
+        }
+
+        let html = "";
+        for (let i = 1; i < parts.length; i += 2) {
+            const slideNum = parts[i];
+            const slideBody = parts[i + 1] ? parts[i + 1].trim() : "";
+            html += `
+                <div class="card slide-card">
+                    <div class="slide-card-header d-flex align-items-center justify-content-between">
+                        <span><i class="fas fa-file-powerpoint me-2 text-warning"></i> Slide ${slideNum}</span>
+                        <span class="badge bg-warning bg-opacity-20 text-warning">Slide ${slideNum}</span>
+                    </div>
+                    <div class="card-body p-4 text-white">
+                        <div style="white-space: pre-wrap; font-size: 0.95rem; line-height: 1.6;">${escapeHtml(slideBody)}</div>
+                    </div>
+                </div>
+            `;
+        }
+        container.innerHTML = html || `<div class="p-3 text-muted">No slide text extracted.</div>`;
+    }
+
+    function renderFormattedMarkdown() {
+        const viewer = document.getElementById("formatted-markdown-viewer");
+        if (!viewer) return;
+
+        const rawText = {{ material.extracted_text|tojson if material.extracted_text else '""' }};
+        if (!rawText || !rawText.trim()) {
+            viewer.innerHTML = `<span class="text-muted">No extracted text content available.</span>`;
+            return;
+        }
+
+        let escaped = escapeHtml(rawText);
+
+        let html = escaped.replace(/(?:^|\n)(\|.*\|(?:\n\|.*\|)+)/g, function(match) {
+            const lines = match.trim().split('\n');
+            let tableHtml = '<table class="table table-dark table-bordered my-3" style="width:100%;"><tbody>';
+            lines.forEach((line, idx) => {
+                const cells = line.split('|').filter((c, i, arr) => i > 0 && i < arr.length - 1);
+                if (cells.every(c => c.trim().match(/^:?-+:?$/))) {
+                    return;
+                }
+                const isHeader = (idx === 0);
+                const tag = isHeader ? 'th' : 'td';
+                const style = isHeader ? 'background:rgba(124,58,237,0.25); color:#c084fc; font-weight:bold; border:1px solid rgba(255,255,255,0.15); padding:8px 12px;' : 'border:1px solid rgba(255,255,255,0.12); padding:8px 12px;';
+                tableHtml += '<tr style="background:rgba(255,255,255,0.02);">';
+                cells.forEach(cell => {
+                    tableHtml += `<${tag} style="${style}">${cell.trim()}</${tag}>`;
+                });
+                tableHtml += '</tr>';
+            });
+            tableHtml += '</tbody></table>';
+            return tableHtml;
+        });
+
+        html = html.replace(/^--- Slide (\d+) ---$/gm, '<div class="badge bg-warning bg-opacity-20 text-warning fs-6 mt-4 mb-2 p-2 px-3"><i class="fas fa-file-powerpoint me-2"></i>Slide $1</div>');
+        html = html.replace(/^### (.*$)/gm, '<h5 class="fw-bold text-primary mt-4 mb-2">$1</h5>');
+        html = html.replace(/^## (.*$)/gm, '<h4 class="fw-bold text-purple mt-4 mb-2">$1</h4>');
+        html = html.replace(/^# (.*$)/gm, '<h3 class="fw-bold text-gradient mt-4 mb-2">$1</h3>');
+
+        html = html.replace(/\*\*(.*?)\*\*/g, '<strong class="text-white">$1</strong>');
+        html = html.replace(/\*(.*?)\*/g, '<em>$1</em>');
+
+        html = html.replace(/\n/g, '<br>');
+        viewer.innerHTML = html;
+    }
+
+    let isPaperMode = true;
+
+    function toggleDocViewerTheme() {
+        isPaperMode = !isPaperMode;
+        const containers = document.querySelectorAll(".docx-preview-container, .document-rich-text-viewer, #formatted-markdown-viewer");
+        const toggleBtn1 = document.getElementById("btn-doc-theme-toggle");
+        const toggleBtn2 = document.getElementById("btn-doc-theme-toggle-text");
+
+        containers.forEach(el => {
+            if (isPaperMode) {
+                el.classList.remove("dark-slate-mode");
+                el.classList.add("paper-mode");
+            } else {
+                el.classList.remove("paper-mode");
+                el.classList.add("dark-slate-mode");
+            }
+        });
+
+        [toggleBtn1, toggleBtn2].forEach(btn => {
+            if (btn) {
+                if (isPaperMode) {
+                    btn.innerHTML = '<i class="fas fa-moon me-1 text-info"></i> 🌙 Dark Slate Mode';
+                    btn.className = 'btn btn-outline-light btn-sm fw-bold shadow-sm';
+                } else {
+                    btn.innerHTML = '<i class="fas fa-file-alt me-1 text-warning"></i> 📄 Paper Mode';
+                    btn.className = 'btn btn-outline-warning btn-sm fw-bold shadow-sm';
+                }
+            }
+        });
+    }
+
+    document.addEventListener("DOMContentLoaded", function() {
+        renderPPTXSlides();
+        renderFormattedMarkdown();
+    });
+</script>
+{% endblock %}

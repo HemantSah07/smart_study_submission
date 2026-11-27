@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800" width="100%" height="100%">
+  <defs>
+    <linearGradient id="j-bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#030712"/>
+      <stop offset="50%" stop-color="#0b1329"/>
+      <stop offset="100%" stop-color="#1e1b4b"/>
+    </linearGradient>
+    <linearGradient id="j-line" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#38bdf8"/>
+      <stop offset="50%" stop-color="#818cf8"/>
+      <stop offset="100%" stop-color="#c084fc"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="800" fill="url(#j-bg)"/>
+  <!-- Mountain contours and timeline nodes -->
+  <path d="M 0 600 Q 300 400 600 520 T 1200 350 L 1200 800 L 0 800 Z" fill="#0f172a" opacity="0.6"/>
+  <path d="M 0 680 Q 400 500 800 600 T 1200 480 L 1200 800 L 0 800 Z" fill="#1e293b" opacity="0.8"/>
+  <path d="M 100 650 C 300 450, 500 550, 700 380 C 900 210, 1050 300, 1150 150" fill="none" stroke="url(#j-line)" stroke-width="6" stroke-linecap="round"/>
+  <!-- Glowing nodes -->
+  <circle cx="100" cy="650" r="10" fill="#38bdf8"/>
+  <circle cx="400" cy="510" r="12" fill="#818cf8"/>
+  <circle cx="700" cy="380" r="14" fill="#a855f7"/>
+  <circle cx="950" cy="240" r="16" fill="#c084fc"/>
+  <circle cx="1150" cy="150" r="18" fill="#38bdf8"/>
+</svg>

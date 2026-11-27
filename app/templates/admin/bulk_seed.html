@@ -1,0 +1,136 @@
+{% extends 'base.html' %}
+{% block title %}Bulk MCQ Seeding — Admin{% endblock %}
+
+{% block content %}
+<div class="hero-banner mb-4">
+    <h1 class="page-title mb-2"><i class="fas fa-seedling me-2 text-gradient"></i> Bulk MCQ Seeding</h1>
+    <p class="page-subtitle mb-0">Generate assessment question banks for multiple subjects simultaneously. Respects rate limits and daily API caps.</p>
+</div>
+
+<div class="row g-4">
+    <!-- Configuration / Trigger Form -->
+    <div class="col-lg-6">
+        <div class="card card-flat p-4 h-100">
+            <h5 class="fw-bold text-white mb-3"><i class="fas fa-tasks text-primary me-2"></i> Select Subjects</h5>
+            <p class="text-muted small">Only active subjects are listed here. Choose the ones you wish to seed with assessment questions.</p>
+
+            <form action="{{ url_for('admin.bulk_seed_questions') }}" method="POST" id="seedForm">
+                <div class="mb-3 d-flex justify-content-between align-items-center">
+                    <button type="button" class="btn btn-outline-secondary btn-xs" onclick="toggleSelectAll(true)">Select All</button>
+                    <button type="button" class="btn btn-outline-secondary btn-xs" onclick="toggleSelectAll(false)">Clear All</button>
+                </div>
+                <div style="max-height: 320px; overflow-y: auto; border: 1px solid #2d3748; border-radius: 8px; padding: 10px;" class="bg-dark mb-4">
+                    {% for s in subjects %}
+                    <div class="form-check py-1 border-bottom border-secondary last-border-none">
+                        <input class="form-check-input subj-checkbox" type="checkbox" name="subject_ids" value="{{ s.id }}" id="subj_{{ s.id }}">
+                        <label class="form-check-label text-white small" for="subj_{{ s.id }}">
+                            {{ s.name }} <span class="text-muted">({{ s.level_of_study }} - current: {{ q_counts.get(s.id, 0) }} Qs)</span>
+                        </label>
+                    </div>
+                    {% endfor %}
+                </div>
+
+                <button type="submit" class="btn btn-primary w-100 py-3 fw-semibold" id="startBtn" {% if state.running %}disabled{% endif %}>
+                    <i class="fas fa-play me-1"></i> Start Bulk Seeding
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Active Job Status / Logs -->
+    <div class="col-lg-6">
+        <div class="card card-flat p-4 h-100">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="fw-bold text-white mb-0"><i class="fas fa-spinner text-primary me-2" id="spinnerIcon"></i> Job Status</h5>
+                {% if state.running %}
+                <form action="{{ url_for('admin.bulk_seed_stop') }}" method="POST" class="m-0">
+                    <button type="submit" class="btn btn-danger btn-xs"><i class="fas fa-stop me-1"></i> Stop Job</button>
+                </form>
+                {% endif %}
+            </div>
+
+            <!-- Progress bar -->
+            <div class="mb-4">
+                <div class="d-flex justify-content-between text-muted small mb-1">
+                    <span>Progress: <strong id="progressText">{{ state.done }} / {{ state.total }}</strong> subjects</span>
+                    <span id="percentText">0%</span>
+                </div>
+                <div class="progress" style="height:10px;background:#1e293b;">
+                    <div class="progress-bar progress-bar-striped progress-bar-animated bg-success" id="progressBar" style="width: 0%"></div>
+                </div>
+            </div>
+
+            <!-- Logs -->
+            <h6 class="fw-semibold text-white small mb-2"><i class="far fa-list-alt me-1 text-info"></i> Execution Log</h6>
+            <div id="logConsole" style="background:#0f172a; border: 1px solid #1e293b; border-radius: 8px; height: 260px; overflow-y: auto; font-family: monospace; padding: 12px;" class="small text-white-50">
+                {% for log_line in state.log %}
+                <div class="py-1">{{ log_line }}</div>
+                {% endfor %}
+                {% if state.errors %}
+                <div class="text-danger fw-bold mt-2">Errors:</div>
+                {% for err in state.errors %}
+                <div class="text-danger py-1">{{ err }}</div>
+                {% endfor %}
+                {% endif %}
+                {% if not state.log and not state.errors %}
+                <div class="text-muted">No active bulk seed job running. Select subjects and click "Start" above.</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function toggleSelectAll(select) {
+    document.querySelectorAll('.subj-checkbox').forEach(cb => cb.checked = select);
+}
+
+// Live polling when a job is active
+{% if state.running %}
+(function() {
+    var checkInterval = setInterval(function() {
+        fetch("{{ url_for('admin.bulk_seed_status') }}")
+            .then(res => res.json())
+            .then(data => {
+                // Update progress elements
+                document.getElementById('progressText').innerText = data.done + " / " + data.total;
+                var pct = data.total > 0 ? Math.round((data.done / data.total) * 100) : 0;
+                document.getElementById('percentText').innerText = pct + "%";
+                document.getElementById('progressBar').style.width = pct + "%";
+
+                // Update console logs
+                var consoleEl = document.getElementById('logConsole');
+                consoleEl.innerHTML = "";
+                data.log.forEach(line => {
+                    var d = document.createElement('div');
+                    d.className = "py-1";
+                    d.innerText = line;
+                    consoleEl.appendChild(d);
+                });
+                if (data.errors && data.errors.length > 0) {
+                    var title = document.createElement('div');
+                    title.className = "text-danger fw-bold mt-2";
+                    title.innerText = "Errors:";
+                    consoleEl.appendChild(title);
+                    data.errors.forEach(err => {
+                        var d = document.createElement('div');
+                        d.className = "text-danger py-1";
+                        d.innerText = err;
+                        consoleEl.appendChild(d);
+                    });
+                }
+                consoleEl.scrollTop = consoleEl.scrollHeight;
+
+                if (!data.running) {
+                    clearInterval(checkInterval);
+                    location.reload(); // Refresh the page to restore start button state
+                }
+            })
+            .catch(err => {
+                console.error("Status polling failed:", err);
+            });
+    }, 2000);
+})();
+{% endif %}
+</script>
+{% endblock %}

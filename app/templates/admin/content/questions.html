@@ -1,0 +1,136 @@
+{% extends 'admin/admin_base.html' %}
+{% block title %}MCQ Question Bank — Content Management{% endblock %}
+
+{% block breadcrumb_items %}
+    <a href="{{ url_for('admin.content_stats') }}">Content</a>
+    <span class="sep"><i class="fas fa-chevron-right"></i></span>
+    <span class="active-item">MCQ Question Bank</span>
+{% endblock %}
+
+{% block admin_content %}
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+    <div>
+        <h1 class="h3 fw-bold text-white mb-1"><i class="fas fa-question-circle me-2 text-primary"></i> MCQ Question Bank Directory</h1>
+        <p class="text-muted small mb-0">Search and manage diagnostic assessment questions and AI-generated practice MCQs across all subjects.</p>
+    </div>
+    <div class="d-flex gap-2">
+        <span class="badge-status active fs-6"><i class="fas fa-database"></i> {{ total }} Total Questions</span>
+    </div>
+</div>
+
+<!-- Filters Bar -->
+<div class="admin-card p-3 mb-4">
+    <form method="GET" action="{{ url_for('admin.content_questions') }}" class="row g-2 align-items-center">
+        <div class="col-12 col-md-5">
+            <label class="form-label text-muted small fw-semibold mb-1">Subject</label>
+            <select name="subject_id" class="form-select admin-form-control">
+                <option value="">-- All Subjects --</option>
+                {% for s in subjects %}
+                <option value="{{ s.id }}" {% if s.id == subject_id %}selected{% endif %}>{{ s.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-12 col-md-4">
+            <label class="form-label text-muted small fw-semibold mb-1">Difficulty Level</label>
+            <select name="difficulty" class="form-select admin-form-control">
+                <option value="">-- All Difficulty Levels --</option>
+                <option value="easy" {% if difficulty == 'easy' %}selected{% endif %}>Easy / Beginner</option>
+                <option value="medium" {% if difficulty == 'medium' %}selected{% endif %}>Medium / Intermediate</option>
+                <option value="hard" {% if difficulty == 'hard' %}selected{% endif %}>Hard / Advanced</option>
+            </select>
+        </div>
+        <div class="col-12 col-md-3 align-self-end">
+            <div class="d-flex gap-2">
+                <button type="submit" class="btn btn-admin btn-admin-primary btn-admin-sm w-100 justify-content-center">
+                    <i class="fas fa-filter"></i> Apply Filter
+                </button>
+                <a href="{{ url_for('admin.content_questions') }}" class="btn btn-admin btn-admin-secondary btn-admin-sm">
+                    Clear
+                </a>
+            </div>
+        </div>
+    </form>
+</div>
+
+<!-- Questions Table -->
+<div class="admin-table-container mb-4">
+    <table class="admin-table">
+        <thead>
+            <tr>
+                <th class="ps-4">Question Text &amp; Options</th>
+                <th>Subject</th>
+                <th>Difficulty</th>
+                <th>Type</th>
+                <th>Generation Source</th>
+                <th>Created Date</th>
+                <th class="pe-4 text-end">Action</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for q in questions %}
+            <tr>
+                <td class="ps-4" style="max-width: 400px;">
+                    <div class="fw-bold text-white small text-truncate" title="{{ q.question_text }}">
+                        {{ q.question_text[:120] }}{% if q.question_text|length > 120 %}...{% endif %}
+                    </div>
+                    <div class="text-dim small mt-1">
+                        A: {{ q.option_a[:35] }} &bull; B: {{ q.option_b[:35] }}
+                    </div>
+                </td>
+                <td>
+                    <span class="badge bg-primary-subtle text-primary border border-primary-subtle px-2 py-1">{{ q.subject.name if q.subject else 'Unassigned' }}</span>
+                </td>
+                <td>
+                    {% if q.difficulty == 'hard' %}
+                    <span class="badge-status error"><i class="fas fa-gauge-high"></i> Hard</span>
+                    {% elif q.difficulty == 'medium' %}
+                    <span class="badge-status warning"><i class="fas fa-gauge"></i> Medium</span>
+                    {% else %}
+                    <span class="badge-status active"><i class="fas fa-gauge-simple"></i> Easy</span>
+                    {% endif %}
+                </td>
+                <td><span class="badge bg-secondary-subtle text-white border border-secondary px-2 py-1">{{ q.question_type or 'MCQ' }}</span></td>
+                <td><span class="small text-muted">{{ q.source or 'AI Generated' }}</span></td>
+                <td class="text-muted small">{{ q.generated_at.strftime('%Y-%m-%d') if q.generated_at else 'N/A' }}</td>
+                <td class="pe-4 text-end">
+                    <form action="{{ url_for('admin.content_delete_question', q_id=q.id) }}" method="POST" onsubmit="return confirm('Delete this question permanently?')">
+                        <button type="submit" class="btn btn-admin btn-admin-danger btn-admin-sm" title="Delete MCQ">
+                            <i class="fas fa-trash-can"></i>
+                        </button>
+                    </form>
+                </td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="7" class="text-center py-5 text-muted">
+                    <i class="fas fa-question-circle fs-2 text-dim mb-2 d-block"></i>
+                    No MCQ questions found matching the filter criteria.
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<!-- Pagination -->
+{% if pages > 1 %}
+<div class="d-flex align-items-center justify-content-between">
+    <div class="text-muted small">
+        Showing page {{ page }} of {{ pages }} ({{ total }} total questions)
+    </div>
+    <div class="d-flex gap-1">
+        {% if page > 1 %}
+        <a href="{{ url_for('admin.content_questions', page=page-1, subject_id=subject_id, difficulty=difficulty) }}" class="btn btn-admin btn-admin-secondary btn-admin-sm">
+            <i class="fas fa-chevron-left"></i> Previous
+        </a>
+        {% endif %}
+        
+        {% if page < pages %}
+        <a href="{{ url_for('admin.content_questions', page=page+1, subject_id=subject_id, difficulty=difficulty) }}" class="btn btn-admin btn-admin-secondary btn-admin-sm">
+            Next <i class="fas fa-chevron-right"></i>
+        </a>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,379 @@
+{% extends 'admin/admin_base.html' %}
+{% block title %}Academic Programs — Taxonomy Management{% endblock %}
+
+{% block breadcrumb_items %}
+    <a href="{{ url_for('admin.curriculum_levels') }}">Curriculum</a>
+    <span class="sep"><i class="fas fa-chevron-right"></i></span>
+    <span class="active-item">Programs</span>
+{% endblock %}
+
+{% block admin_content %}
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+    <div>
+        <h1 class="h3 fw-bold text-white mb-1"><i class="fas fa-graduation-cap me-2 text-primary"></i> Academic Programs Catalog</h1>
+        <p class="text-muted small mb-0">Bachelors & Masters degree programs (e.g. BSc IT, BCA, BBA, BIT) and their structural subject mappings.</p>
+    </div>
+    <div class="d-flex gap-2">
+        <button type="button" class="btn btn-admin btn-admin-primary" data-bs-toggle="modal" data-bs-target="#addProgramModal">
+            <i class="fas fa-plus-circle me-1"></i> Add Academic Program
+        </button>
+    </div>
+</div>
+
+<!-- Taxonomy Nav Pills -->
+<div class="admin-card p-2 mb-4">
+    <div class="d-flex flex-wrap gap-2">
+        <a href="{{ url_for('admin.curriculum_levels') }}" class="btn btn-admin btn-admin-secondary btn-admin-sm">
+            <i class="fas fa-layer-group me-1"></i> 1. Education Levels
+        </a>
+        <a href="{{ url_for('admin.curriculum_universities') }}" class="btn btn-admin btn-admin-secondary btn-admin-sm">
+            <i class="fas fa-university me-1"></i> 2. Universities
+        </a>
+        <a href="{{ url_for('admin.curriculum_faculties') }}" class="btn btn-admin btn-admin-secondary btn-admin-sm">
+            <i class="fas fa-stream me-1"></i> 3. Faculties
+        </a>
+        <a href="{{ url_for('admin.curriculum_programs') }}" class="btn btn-admin btn-admin-primary btn-admin-sm">
+            <i class="fas fa-graduation-cap me-1"></i> 4. Programs ({{ programs|length }})
+        </a>
+        <a href="{{ url_for('admin.curriculum_subjects') }}" class="btn btn-admin btn-admin-secondary btn-admin-sm">
+            <i class="fas fa-book me-1"></i> 5. Subjects Catalog
+        </a>
+    </div>
+</div>
+
+<!-- Data Table -->
+<div class="admin-table-container">
+    <table class="admin-table">
+        <thead>
+            <tr>
+                <th class="ps-4">Program Name</th>
+                <th>Degree Level</th>
+                <th>Duration Configuration</th>
+                <th>Student Usage</th>
+                <th>Status</th>
+                <th class="pe-4 text-end">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in programs %}
+            <tr>
+                <td class="ps-4">
+                    <div class="fw-bold text-white fs-6">{{ item.name }}</div>
+                    <div class="text-dim small">ID #{{ item.id }}</div>
+                </td>
+                <td>
+                    <span class="badge bg-primary-subtle text-primary border border-primary-subtle px-2.5 py-1 font-semibold">{{ item.level_name }}</span>
+                </td>
+                <td>
+                    {% if item.has_duration %}
+                        <span class="badge-status info"><i class="fas fa-clock"></i> Variable (3 / 4 Yrs)</span>
+                    {% else %}
+                        <span class="text-muted small">Standard (4 Years)</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% set count = usage_counts.get(item.name, 0) %}
+                    {% if count > 0 %}
+                    <span class="badge-status active"><i class="fas fa-user-graduate"></i> {{ count }} students</span>
+                    {% else %}
+                    <span class="text-dim small">0 students</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if item.is_active %}
+                    <span class="badge-status active"><i class="fas fa-check-circle"></i> Active</span>
+                    {% else %}
+                    <span class="badge-status error"><i class="fas fa-ban"></i> Archived</span>
+                    {% endif %}
+                </td>
+                <td class="pe-4 text-end">
+                    <div class="d-inline-flex gap-1.5 flex-wrap justify-content-end">
+                        <!-- Structure / Manage Subjects Link -->
+                        <a href="{{ url_for('admin.curriculum_program_detail', prog_id=item.id) }}" class="btn btn-admin btn-admin-primary btn-admin-sm">
+                            <i class="fas fa-diagram-project me-1"></i> Subjects
+                        </a>
+                        <button class="btn btn-admin btn-admin-secondary btn-admin-sm" data-bs-toggle="modal" data-bs-target="#editModal{{ item.id }}">
+                            <i class="fas fa-edit"></i> Edit
+                        </button>
+                        <form action="{{ url_for('admin.curriculum_programs_toggle', prog_id=item.id) }}" method="POST" class="d-inline">
+                            {% if item.is_active %}
+                            <button type="submit" class="btn btn-admin btn-admin-danger btn-admin-sm" onclick="return confirmDeactivate('{{ item.name }}', {{ count }})">
+                                Archive
+                            </button>
+                            {% else %}
+                            <button type="submit" class="btn btn-admin btn-admin-primary btn-admin-sm">
+                                Reactivate
+                            </button>
+                            {% endif %}
+                        </form>
+                        {% if current_user.is_super_admin %}
+                        <button type="button" class="btn btn-danger btn-admin-sm fw-bold ms-1" data-bs-toggle="modal" data-bs-target="#deleteProgModal{{ item.id }}">
+                            <i class="fas fa-trash-alt"></i> Permanently Delete
+                        </button>
+                        {% endif %}
+                    </div>
+                </td>
+            </tr>
+
+            {% if current_user.is_super_admin %}
+            <!-- Permanent Delete Modal for Program -->
+            <div class="modal fade admin-modal text-start" id="deleteProgModal{{ item.id }}" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content bg-dark text-white border-danger shadow-lg">
+                        <div class="modal-header border-bottom border-danger bg-danger bg-opacity-25">
+                            <h5 class="modal-title text-danger fw-bold"><i class="fas fa-exclamation-triangle me-2"></i>Permanently Delete Academic Program?</h5>
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="alert alert-danger bg-danger bg-opacity-10 border-danger text-white mb-3 small">
+                                <strong>THIS ACTION IS IRREVERSIBLE.</strong> The program record <strong class="text-warning">{{ item.name }}</strong> will be permanently deleted along with its program-subject mappings.
+                            </div>
+                            <p class="small text-muted mb-2">Type the exact record name below to confirm deletion:</p>
+                            <code class="d-block mb-3 p-2 bg-black rounded text-info font-monospace text-center fs-6 user-select-all">{{ item.name }}</code>
+                            
+                            <form method="POST" action="{{ url_for('admin.delete_permanent_program', program_id=item.id) }}">
+                                <div class="mb-3">
+                                    <input type="text" name="confirm_text" class="form-control bg-dark border-secondary text-white font-monospace text-center confirm-prog-input" data-target="{{ item.name }}" placeholder="Type program name to confirm" autocomplete="off" required>
+                                </div>
+                                <div class="d-flex justify-content-end gap-2">
+                                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                                    <button type="submit" class="btn btn-danger btn-sm fw-bold confirm-prog-btn" disabled style="opacity: 0.5; cursor: not-allowed; pointer-events: none;">
+                                        <i class="fas fa-trash-alt me-1"></i> Permanently Delete
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+
+            <!-- Edit Modal -->
+            <div class="modal fade admin-modal" id="editModal{{ item.id }}" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered modal-lg">
+                    <div class="modal-content">
+                        <form action="{{ url_for('admin.curriculum_programs_edit', prog_id=item.id) }}" method="POST">
+                            <div class="modal-header">
+                                <h5 class="modal-title fw-bold text-white"><i class="fas fa-edit text-primary me-2"></i> Edit Program Configuration</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                            </div>
+                            <div class="modal-body">
+                                <div class="row g-3">
+                                    <div class="col-md-6">
+                                        <label class="form-label text-muted small fw-semibold">Program Name</label>
+                                        <input type="text" name="name" class="form-control admin-form-control" value="{{ item.name }}" required>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label text-muted small fw-semibold">Level Name</label>
+                                        <select name="level_name" class="form-select admin-form-control" required>
+                                            <option value="Bachelors" {% if item.level_name == 'Bachelors' %}selected{% endif %}>Bachelors</option>
+                                            <option value="Masters" {% if item.level_name == 'Masters' %}selected{% endif %}>Masters</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div class="form-check form-switch mt-3 mb-3">
+                                    <input class="form-check-input" type="checkbox" name="has_duration" id="hasDurationEdit{{ item.id }}" {% if item.has_duration %}checked{% endif %}>
+                                    <label class="form-check-label text-white small fw-semibold" for="hasDurationEdit{{ item.id }}">Has variable program duration (e.g. 3 Years vs 4 Years)</label>
+                                </div>
+
+                                <!-- Dynamic Duration Options for Edit Modal -->
+                                <div id="durationOptionsContainerEdit{{ item.id }}" class="p-3 rounded mb-3" style="background: rgba(0,0,0,0.25); border: 1px solid var(--admin-border); {% if not item.has_duration %}display: none;{% endif %}">
+                                    <label class="form-label text-muted small fw-semibold d-block mb-2">Duration Dropdown Options</label>
+                                    <div id="durationRowsEdit{{ item.id }}">
+                                        {% if item.parsed_duration_options %}
+                                            {% for opt in item.parsed_duration_options %}
+                                            <div class="row g-2 mb-2 align-items-center duration-row">
+                                                <div class="col-5">
+                                                    <input type="text" name="duration_values[]" class="form-control form-control-sm admin-form-control" value="{{ opt.value }}" placeholder="Value (e.g. 3 Years)" required>
+                                                </div>
+                                                <div class="col-6">
+                                                    <input type="text" name="duration_labels[]" class="form-control form-control-sm admin-form-control" value="{{ opt.label }}" placeholder="Label (e.g. 3 Years (APU/LBEF))">
+                                                </div>
+                                                <div class="col-1 text-end">
+                                                    <button type="button" class="btn btn-sm btn-outline-danger border-0 p-0 remove-duration-row" title="Remove"><i class="fas fa-trash-alt"></i></button>
+                                                </div>
+                                            </div>
+                                            {% endfor %}
+                                        {% else %}
+                                            <div class="row g-2 mb-2 align-items-center duration-row">
+                                                <div class="col-5">
+                                                    <input type="text" name="duration_values[]" class="form-control form-control-sm admin-form-control" placeholder="Value" value="3 Years" required>
+                                                </div>
+                                                <div class="col-6">
+                                                    <input type="text" name="duration_labels[]" class="form-control form-control-sm admin-form-control" placeholder="Label" value="3 Years (International-affiliated, e.g. APU/LBEF)">
+                                                </div>
+                                                <div class="col-1 text-end">
+                                                    <button type="button" class="btn btn-sm btn-outline-danger border-0 p-0 remove-duration-row"><i class="fas fa-trash-alt"></i></button>
+                                                </div>
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                    <button type="button" class="btn btn-admin btn-admin-secondary btn-admin-sm w-100 mt-2 add-duration-row-btn" data-target-id="{{ item.id }}">
+                                        <i class="fas fa-plus me-1"></i> Add Duration Option
+                                    </button>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label text-muted small fw-semibold">Sort Order</label>
+                                    <input type="number" name="sort_order" class="form-control admin-form-control" value="{{ item.sort_order }}" required>
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-admin btn-admin-secondary btn-admin-sm" data-bs-dismiss="modal">Cancel</button>
+                                <button type="submit" class="btn btn-admin btn-admin-primary btn-admin-sm">Save Changes</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<!-- Modal: Add Program -->
+<div class="modal fade admin-modal" id="addProgramModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+            <form action="{{ url_for('admin.curriculum_programs_add') }}" method="POST">
+                <div class="modal-header">
+                    <h5 class="modal-title fw-bold text-white"><i class="fas fa-plus-circle text-primary me-2"></i> Add Academic Program</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label text-muted small fw-semibold">Program Name</label>
+                            <input type="text" name="name" class="form-control admin-form-control" placeholder="e.g. BSc IT (Cloud Computing)" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label text-muted small fw-semibold">Level Name</label>
+                            <select name="level_name" class="form-select admin-form-control" required>
+                                <option value="Bachelors">Bachelors</option>
+                                <option value="Masters">Masters</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-check form-switch mt-3 mb-3">
+                        <input class="form-check-input" type="checkbox" name="has_duration" id="hasDurationAdd">
+                        <label class="form-check-label text-white small fw-semibold" for="hasDurationAdd">Has variable program duration (e.g. 3 Years vs 4 Years)</label>
+                    </div>
+
+                    <!-- Dynamic Duration Options for Add Form -->
+                    <div id="durationOptionsContainer" class="p-3 rounded mb-3" style="background: rgba(0,0,0,0.25); border: 1px solid var(--admin-border); display: none;">
+                        <label class="form-label text-muted small fw-semibold d-block mb-2">Duration Options</label>
+                        <div id="durationRows">
+                            <div class="row g-2 mb-2 align-items-center duration-row">
+                                <div class="col-5">
+                                    <input type="text" name="duration_values[]" class="form-control form-control-sm admin-form-control" placeholder="Value (e.g. 3 Years)" value="3 Years">
+                                </div>
+                                <div class="col-6">
+                                    <input type="text" name="duration_labels[]" class="form-control form-control-sm admin-form-control" placeholder="Label" value="3 Years (International-affiliated, e.g. APU/LBEF)">
+                                </div>
+                                <div class="col-1 text-end">
+                                    <button type="button" class="btn btn-sm btn-outline-danger border-0 p-0 remove-duration-row"><i class="fas fa-trash-alt"></i></button>
+                                </div>
+                            </div>
+                        </div>
+                        <button type="button" class="btn btn-admin btn-admin-secondary btn-admin-sm w-100 mt-2" id="addDurationRowBtn">
+                            <i class="fas fa-plus me-1"></i> Add Duration Option
+                        </button>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label text-muted small fw-semibold">Sort Order</label>
+                        <input type="number" name="sort_order" class="form-control admin-form-control" value="{{ (programs|length) + 1 }}" required>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-admin btn-admin-secondary btn-admin-sm" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-admin btn-admin-primary btn-admin-sm">Add Program</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function confirmDeactivate(name, studentCount) {
+        if (studentCount > 0) {
+            return confirm(`WARNING: "${name}" is currently in use by ${studentCount} students. Archiving it will deactivate program mappings for this program only (global subjects remain intact).\n\nAre you sure you want to proceed?`);
+        }
+        return confirm(`Are you sure you want to archive "${name}"?`);
+    }
+
+    document.addEventListener("DOMContentLoaded", function() {
+        const hasDurationAdd = document.getElementById("hasDurationAdd");
+        const durationOptionsContainer = document.getElementById("durationOptionsContainer");
+        
+        if (hasDurationAdd && durationOptionsContainer) {
+            hasDurationAdd.addEventListener("change", function() {
+                durationOptionsContainer.style.display = this.checked ? "block" : "none";
+            });
+        }
+
+        function createDurationRow(val = "", lbl = "") {
+            const row = document.createElement("div");
+            row.className = "row g-2 mb-2 align-items-center duration-row";
+            row.innerHTML = `
+                <div class="col-5">
+                    <input type="text" name="duration_values[]" class="form-control form-control-sm admin-form-control" placeholder="Value (e.g. 3 Years)" value="${val}" required>
+                </div>
+                <div class="col-6">
+                    <input type="text" name="duration_labels[]" class="form-control form-control-sm admin-form-control" placeholder="Label (e.g. 3 Years (UK))" value="${lbl}">
+                </div>
+                <div class="col-1 text-end">
+                    <button type="button" class="btn btn-sm btn-outline-danger border-0 p-0 remove-duration-row"><i class="fas fa-trash-alt"></i></button>
+                </div>
+            `;
+            return row;
+        }
+
+        const addDurationRowBtn = document.getElementById("addDurationRowBtn");
+        const durationRows = document.getElementById("durationRows");
+        if (addDurationRowBtn && durationRows) {
+            addDurationRowBtn.addEventListener("click", function() {
+                durationRows.appendChild(createDurationRow());
+            });
+        }
+
+        document.querySelectorAll(".form-check-input[id^='hasDurationEdit']").forEach(checkbox => {
+            const progId = checkbox.id.replace("hasDurationEdit", "");
+            const container = document.getElementById("durationOptionsContainerEdit" + progId);
+            checkbox.addEventListener("change", function() {
+                container.style.display = this.checked ? "block" : "none";
+            });
+        });
+
+        document.querySelectorAll(".add-duration-row-btn").forEach(btn => {
+            const targetId = btn.getAttribute("data-target-id");
+            const rowsContainer = document.getElementById("durationRowsEdit" + targetId);
+            btn.addEventListener("click", function() {
+                rowsContainer.appendChild(createDurationRow());
+            });
+        });
+
+        document.addEventListener("click", function(e) {
+            const btn = e.target.closest(".remove-duration-row");
+            if (btn) {
+                e.preventDefault();
+                const row = btn.closest(".duration-row");
+                if (row) {
+                    row.remove();
+                }
+            }
+        });
+
+        document.querySelectorAll('.confirm-prog-input').forEach(function(input) {
+            if (typeof handleConfirmDeleteInput === 'function') {
+                handleConfirmDeleteInput(input);
+            }
+        });
+    });
+</script>
+{% endblock %}

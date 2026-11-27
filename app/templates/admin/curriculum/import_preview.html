@@ -1,0 +1,145 @@
+{% extends 'admin/admin_base.html' %}
+{% block title %}Preview & Match — Document Ingestion{% endblock %}
+
+{% block breadcrumb_items %}
+    <a href="{{ url_for('admin.curriculum_levels') }}">Curriculum</a>
+    <span class="sep"><i class="fas fa-chevron-right"></i></span>
+    <a href="{{ url_for('admin.curriculum_import') }}">Document Ingestion</a>
+    <span class="sep"><i class="fas fa-chevron-right"></i></span>
+    <span class="active-item">Preview Session #{{ import_session.id }}</span>
+{% endblock %}
+
+{% block admin_content %}
+<!-- Header Bar -->
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+    <div>
+        <h1 class="h3 fw-bold text-white mb-1"><i class="fas fa-eye me-2 text-primary"></i> Syllabus Ingestion Staging Review</h1>
+        <p class="text-muted small mb-0">
+            Source Document: <strong class="text-white">{{ import_session.source_file }}</strong> &bull; 
+            Format: <span class="badge bg-secondary-subtle text-white border border-secondary px-2 py-0.5 font-mono uppercase">{{ import_session.doc_type }}</span> &bull; 
+            Extracted: <strong class="text-white">{{ items|length }}</strong> subject row(s)
+        </p>
+    </div>
+    <div class="d-flex gap-2">
+        <form method="POST" action="{{ url_for('admin.curriculum_import_cancel', session_id=import_session.id) }}">
+            <button type="submit" class="btn btn-admin btn-admin-danger btn-admin-sm" onclick="return confirm('Cancel this uncommitted import session?')">
+                <i class="fas fa-ban me-1"></i> Cancel Session
+            </button>
+        </form>
+    </div>
+</div>
+
+{% if import_session.notes %}
+<div class="p-3 rounded mb-4" style="background: rgba(245, 158, 11, 0.12); border: 1px solid var(--admin-warning); font-size: 0.88rem;">
+    <i class="fas fa-triangle-exclamation text-warning me-2"></i><strong>Extraction Notes:</strong> {{ import_session.notes }}
+</div>
+{% endif %}
+
+<form method="POST" action="{{ url_for('admin.curriculum_import_commit', session_id=import_session.id) }}">
+    <!-- Configuration Card -->
+    <div class="admin-card mb-4">
+        <div class="admin-card-header">
+            <h2 class="admin-card-title"><i class="fas fa-sliders text-primary"></i> Target Program & Commit Mode Configuration</h2>
+        </div>
+        <div class="row g-3">
+            <div class="col-md-6">
+                <label class="form-label text-muted small fw-semibold">Target Curriculum Program *</label>
+                <select name="target_program_id" class="form-select admin-form-control" required>
+                    <option value="">-- Choose Target Program --</option>
+                    {% for p in all_programs %}
+                    <option value="{{ p.id }}" {% if import_session.detected_program_id == p.id %}selected{% endif %}>
+                        {{ p.name }} ({{ p.level_name }})
+                    </option>
+                    {% endfor %}
+                </select>
+                <div class="form-text text-dim small mt-1">Detected program in document: <strong>{{ import_session.detected_program or 'None detected' }}</strong></div>
+            </div>
+            <div class="col-md-6">
+                <label class="form-label text-muted small fw-semibold">Ingestion Mode *</label>
+                <select name="ingestion_mode" class="form-select admin-form-control" required>
+                    <option value="append" selected>APPEND MODE — Keep existing program subjects, add newly approved subjects</option>
+                    <option value="replace">REPLACE / SYNC MODE — Deactivate old program subjects, sync to new list</option>
+                </select>
+                <div class="form-text text-dim small mt-1">Both modes preserve global Subject database records safely.</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Extracted Items Review Table -->
+    <div class="admin-card p-0 mb-4">
+        <div class="admin-card-header px-4 py-3 mb-0">
+            <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
+                <h2 class="admin-card-title fs-6"><i class="fas fa-list-check text-info"></i> Extracted Subject Items</h2>
+                <div class="d-flex gap-2">
+                    <span class="badge-status active">{{ items | selectattr('action', 'equalto', 'LINK_EXISTING') | list | length }} Linked</span>
+                    <span class="badge-status info">{{ items | selectattr('action', 'equalto', 'CREATE_NEW') | list | length }} New</span>
+                    <span class="badge-status warning">{{ items | selectattr('action', 'equalto', 'NEEDS_REVIEW') | list | length }} Review</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="admin-table-container border-0">
+            <table class="admin-table">
+                <thead>
+                    <tr>
+                        <th class="ps-4" style="width: 50px;">Sort</th>
+                        <th style="width: 140px;">Semester</th>
+                        <th style="width: 120px;">Code</th>
+                        <th>Subject Title</th>
+                        <th style="width: 80px;">Credits</th>
+                        <th style="width: 160px;">Match Action</th>
+                        <th class="pe-4">Matched Global Subject</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in items %}
+                    <tr>
+                        <td class="ps-4 text-dim font-mono small">{{ item.sort_order }}</td>
+                        <td>
+                            <input type="text" name="semester_{{ item.id }}" value="{{ item.final_semester or '' }}" class="form-control admin-form-control py-1 px-2 small" placeholder="Semester 1">
+                        </td>
+                        <td>
+                            <input type="text" name="code_{{ item.id }}" value="{{ item.final_code or '' }}" class="form-control admin-form-control py-1 px-2 small" placeholder="CODE">
+                        </td>
+                        <td>
+                            <input type="text" name="name_{{ item.id }}" value="{{ item.final_name or '' }}" class="form-control admin-form-control py-1 px-2 small fw-semibold" required>
+                        </td>
+                        <td>
+                            <input type="number" name="credits_{{ item.id }}" value="{{ item.final_credits or 3 }}" class="form-control admin-form-control py-1 px-2 small" min="1" max="10">
+                        </td>
+                        <td>
+                            <select name="action_{{ item.id }}" class="form-select admin-form-control py-1 px-2 small action-select" data-item-id="{{ item.id }}">
+                                <option value="LINK_EXISTING" {% if item.action == 'LINK_EXISTING' %}selected{% endif %}>LINK_EXISTING</option>
+                                <option value="CREATE_NEW" {% if item.action == 'CREATE_NEW' %}selected{% endif %}>CREATE_NEW</option>
+                                <option value="NEEDS_REVIEW" {% if item.action == 'NEEDS_REVIEW' %}selected{% endif %}>NEEDS_REVIEW</option>
+                                <option value="SKIP" {% if item.action == 'SKIP' %}selected{% endif %}>SKIP</option>
+                            </select>
+                        </td>
+                        <td class="pe-4">
+                            <select name="matched_subject_id_{{ item.id }}" class="form-select admin-form-control py-1 px-2 small">
+                                <option value="">-- Choose Global Subject --</option>
+                                {% for s in all_subjects %}
+                                <option value="{{ s.id }}" {% if item.final_subject_id == s.id or item.matched_subject_id == s.id %}selected{% endif %}>
+                                    [{{ s.code or 'No Code' }}] {{ s.name }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Submit Bar -->
+    <div class="admin-card p-3 d-flex flex-row align-items-center justify-content-between">
+        <a href="{{ url_for('admin.curriculum_import') }}" class="btn btn-admin btn-admin-secondary">
+            <i class="fas fa-arrow-left me-1"></i> Back to Ingestion Sessions
+        </a>
+        <button type="submit" class="btn btn-admin btn-admin-primary">
+            <i class="fas fa-check-circle me-1"></i> Confirm Transactional Commit
+        </button>
+    </div>
+</form>
+{% endblock %}

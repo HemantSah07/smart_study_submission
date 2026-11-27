@@ -1,0 +1,1484 @@
+{% extends 'base.html' %}
+{% block title %}Study Room: {{ subject.name }} · Immersive Learning{% endblock %}
+
+{% block breadcrumbs %}
+<span class="sep"><i class="fas fa-chevron-right"></i></span>
+<span>Workspace</span>
+<span class="sep"><i class="fas fa-chevron-right"></i></span>
+<span class="current">Study Room</span>
+{% endblock %}
+
+{% block content %}
+<div class="ss-page px-2 py-3">
+<!-- ── Study Room Hero ── -->
+<section class="ss-page-hero position-relative overflow-hidden mb-4">
+    <div class="ss-page-hero-bg" style="background-image: url('{{ url_for('static', filename='img/ui/student/study-room.webp') }}');"></div>
+    <div class="ss-page-hero-content py-3">
+        <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
+            <div>
+                <a href="{{ url_for('student.study_material') }}" class="text-decoration-none text-muted small mb-1 d-inline-block">
+                    <i class="fas fa-arrow-left me-1"></i> Knowledge Library
+                </a>
+                <h1 class="display-6 fw-bold text-white mb-1" style="letter-spacing: -0.02em;">
+                    {{ subject.name }} <span class="fs-6 text-muted font-monospace">({{ subject.code }})</span>
+                </h1>
+                <p class="text-muted mb-0" style="font-size: 1.05rem;">
+                    Immersive LMS Study Room — Chapter topics, textbook notes, practice quizzes, and active recall flashcards.
+                </p>
+            </div>
+            <div class="d-flex gap-2">
+                <span class="ss-badge ss-badge-purple py-2 px-3">{{ subject.level_of_study }}</span>
+                {% if subject.program %}
+                <span class="ss-badge ss-badge-cyan py-2 px-3">{{ subject.program }}</span>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</section>
+
+<div class="row g-4">
+    <!-- Sidebar navigation for Chapters & Topics -->
+    <div class="col-md-4 col-lg-3 study-sidebar">
+        <div class="ss-panel p-3 mb-3">
+            <h6 class="fw-bold text-white mb-3"><i class="fas fa-book-open me-2 text-primary"></i> Curriculum Index</h6>
+            {% for ch in chapters %}
+            <div class="ss-card mb-2 p-2">
+                <div class="fw-bold text-white small d-flex justify-content-between align-items-center cursor-pointer" style="letter-spacing: 0.5px; cursor: pointer;" onclick="toggleChapter({{ ch.id }})">
+                    <span><i class="fas fa-folder me-2 text-warning" id="chapter-icon-{{ ch.id }}"></i> Ch {{ ch.chapter_number }}: {{ ch.name }}</span>
+                    <i class="fas fa-chevron-down text-muted small ms-2" id="chapter-chevron-{{ ch.id }}"></i>
+                </div>
+                <div class="d-none mt-2 d-flex flex-column gap-1" id="chapter-topics-{{ ch.id }}" data-loaded="false">
+                    <!-- Topics loaded dynamically via AJAX -->
+                </div>
+            </div>
+            {% else %}
+            <p class="text-muted small mb-0">No chapters outline added yet for this subject.</p>
+            {% endfor %}
+        </div>
+    </div>
+
+
+    <!-- Main Study content area -->
+    <div class="col-md-8 col-lg-9 study-content-panel py-3">
+        <!-- Interactive Tabs -->
+        <div class="d-flex flex-wrap gap-2 mb-4" id="study-tabs">
+            <button class="study-tab-btn active" onclick="switchStudyTab('learn')"><i class="fas fa-graduation-cap me-2"></i> Read & Learn</button>
+            <button class="study-tab-btn" onclick="switchStudyTab('practice')"><i class="fas fa-pencil-alt me-2"></i> Practice Exercises</button>
+            <button class="study-tab-btn" onclick="switchStudyTab('quiz')"><i class="fas fa-clipboard-check me-2"></i> MCQ Quiz</button>
+            <button class="study-tab-btn" onclick="switchStudyTab('flashcards')"><i class="fas fa-clone me-2"></i> Flashcards</button>
+            <button class="study-tab-btn" onclick="switchStudyTab('notes')"><i class="fas fa-sticky-note me-2"></i> My Notes</button>
+            <button class="study-tab-btn" onclick="switchStudyTab('coverage'); loadSyllabusCoverage();"><i class="fas fa-chart-pie me-2"></i> Syllabus Coverage</button>
+            <button class="study-tab-btn" onclick="switchStudyTab('module-info'); loadModuleInfo();"><i class="fas fa-info-circle me-2"></i> Course Info</button>
+        </div>
+
+        <!-- TAB Content: Learn -->
+        <div id="tab-learn" class="tab-content-item">
+            <div class="card card-light p-4">
+                <div id="material-textbook">
+                    <div class="text-center py-5 text-muted">
+                        <i class="fas fa-arrow-left fa-3x mb-3 text-primary opacity-30 animate-pulse"></i>
+                        <h5>Select a Topic from the Sidebar</h5>
+                        <p class="small mb-0">Click any topic in the curriculum index to load textbook study content, quizzes, and flashcards.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB Content: Practice -->
+        <div id="tab-practice" class="tab-content-item d-none">
+            <div class="card card-light p-4">
+                <h4 class="fw-bold mb-3 text-gradient"><i class="fas fa-dumbbell me-2"></i> Practice exercises</h4>
+                <p class="text-muted small mb-4">Challenge your understanding by writing down answers for these conceptual, mathematical, and coding problems.</p>
+                <div id="material-practice-content">
+                    <p class="text-muted">Select a topic from the sidebar to view practice questions.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB Content: Quiz -->
+        <div id="tab-quiz" class="tab-content-item d-none">
+            <div class="card card-light p-4">
+                <h4 class="fw-bold mb-3 text-gradient"><i class="fas fa-check-circle me-2"></i> Chapter Practice Quiz</h4>
+                <p class="text-muted small mb-4">Answer the multiple-choice questions below. You will receive immediate grading and a step-by-step logic explanation for every question!</p>
+                <div id="quiz-alert-container"></div>
+                <form id="topic-quiz-form" onsubmit="submitQuiz(event)">
+                    <div id="material-quiz-content">
+                        <p class="text-muted">Select a topic from the sidebar to start a quiz.</p>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- TAB Content: Flashcards -->
+        <div id="tab-flashcards" class="tab-content-item d-none">
+            <div class="card card-light p-4 text-center">
+                <h4 class="fw-bold mb-3 text-gradient"><i class="fas fa-bolt me-2"></i> Interactive Flashcards</h4>
+                <p class="text-muted small mb-4">Click the card to flip it and reveal the answer. Use flashcards for active recall.</p>
+                
+                <div class="flashcard-box" id="flashcard" onclick="this.classList.toggle('flipped')">
+                    <div class="flashcard-inner">
+                        <div class="flashcard-front">
+                            <h6 class="text-primary small mb-3">QUESTION</h6>
+                            <h5 id="flashcard-q" class="fw-bold">What is set cardinality?</h5>
+                            <small class="text-muted mt-4">Click Card to Flip</small>
+                        </div>
+                        <div class="flashcard-back">
+                            <h6 class="text-warning small mb-3">EXPLANATION / ANSWER</h6>
+                            <h5 id="flashcard-a" class="fw-bold">The number of elements contained in the set.</h5>
+                            <small class="text-muted mt-4">Click Card to Flip</small>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="d-flex justify-content-center gap-3 mt-4">
+                    <button class="btn btn-outline-primary" onclick="prevFlashcard()"><i class="fas fa-chevron-left"></i> Previous</button>
+                    <button class="btn btn-outline-primary" onclick="nextFlashcard()">Next <i class="fas fa-chevron-right"></i></button>
+                </div>
+                <div class="small text-muted mt-2" id="flashcard-count">Card 1 / 1</div>
+            </div>
+        </div>
+
+        <!-- TAB Content: Notes -->
+        <div id="tab-notes" class="tab-content-item d-none">
+            <div class="card card-light p-4">
+                <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+                    <div>
+                        <h4 class="fw-bold mb-1 text-gradient"><i class="fas fa-sticky-note me-2"></i> Subject Notes</h4>
+                        <p class="text-muted small mb-0">Record definitions, equations, loops, or thoughts. Your notes auto-save on typing.</p>
+                    </div>
+                    <span class="badge bg-success py-2 px-3 d-none" id="save-indicator"><i class="fas fa-save me-1"></i> Saved!</span>
+                </div>
+                <textarea id="notes-content" class="form-control" rows="15" placeholder="Write down formulas, code templates, or revision plans here..." style="font-family: 'Consolas', 'Courier New', monospace; font-size: 15px; color: #e2e8f0; background: #0f172a; border: 1px solid rgba(255,255,255,0.05); border-radius: 8px;">{{ notes_content }}</textarea>
+            </div>
+        </div>
+
+        <!-- TAB Content: Syllabus Coverage -->
+        <div id="tab-coverage" class="tab-content-item d-none">
+            <div class="card card-light p-4">
+                <h4 class="fw-bold mb-2 text-gradient"><i class="fas fa-chart-pie me-2"></i> Syllabus Coverage Gap Analysis</h4>
+                <p class="text-muted small mb-4">Calculates semantic vector similarity between your uploaded study material and official module descriptor syllabus topics.</p>
+                <div id="coverage-content">
+                    <div class="text-center py-4 text-muted"><i class="fas fa-spinner fa-spin me-2"></i> Analyzing syllabus coverage...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB Content: Course Info -->
+        <div id="tab-module-info" class="tab-content-item d-none">
+            <div class="card card-light p-4">
+                <h4 class="fw-bold mb-2 text-gradient"><i class="fas fa-info-circle me-2"></i> Official Module Descriptor Information</h4>
+                <p class="text-muted small mb-4">Structured grading weights, exam format, and assessment dates extracted automatically from uploaded Module Descriptors.</p>
+                <div id="module-info-content">
+                    <div class="text-center py-4 text-muted"><i class="fas fa-spinner fa-spin me-2"></i> Loading course information...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    </div>
+</div>
+
+<!-- PDF Generation Loading Overlay -->
+<div id="pdf-loading-overlay" class="position-fixed top-0 start-0 w-100 h-100 d-none d-flex align-items-center justify-content-center" style="background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(8px); z-index: 1050;">
+    <div class="text-center p-5 rounded-4 border border-secondary bg-dark-card" style="max-width: 400px; box-shadow: 0 20px 50px rgba(0,0,0,0.5);">
+        <div class="spinner-grow text-primary mb-3" style="width: 3rem; height: 3rem;" role="status"></div>
+        <h5 class="fw-bold text-white mb-2">Preparing Chapter PDF</h5>
+        <p class="text-muted small mb-0">Preparing chapter, this may take a moment</p>
+    </div>
+</div>
+
+<!-- AI Chapter Quiz Modal -->
+<div class="modal fade" id="chapterQuizModal" tabindex="-1" aria-labelledby="chapterQuizModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content bg-dark-card border-secondary text-white">
+            <div class="modal-header border-secondary">
+                <h5 class="modal-title fw-bold text-gradient" id="chapterQuizModalLabel"><i class="fas fa-brain me-2"></i>AI Chapter Quiz</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div id="chapter-quiz-loading" class="text-center py-5">
+                    <div class="spinner-border text-primary mb-3" role="status"></div>
+                    <p class="text-muted small">Generating 5 personalized assessment questions using AI...</p>
+                </div>
+                <div id="quiz-degraded-banner" class="alert alert-warning d-none mb-3 small">
+                    <i class="fas fa-wifi me-1"></i>
+                </div>
+                <div id="chapter-quiz-content" class="d-none">
+                    <!-- Questions will be injected here -->
+                </div>
+            </div>
+            <div class="modal-footer border-secondary">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" id="btn-submit-chapter-quiz" onclick="submitChapterQuiz()">Submit Quiz</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let activeTopicId = null;
+    let flashcardsData = [];
+    let currentFlashcardIdx = 0;
+
+    // Load initial data from backend if flashcards exist globally
+    {% if flashcards %}
+        flashcardsData = [
+            {% for f in flashcards %}
+                { front: "{{ f.front|escape }}", back: "{{ f.back|escape }}" },
+            {% endfor %}
+        ];
+    {% endif %}
+
+    function toggleChapter(chapterId, forceExpand = false) {
+        const container = document.getElementById("chapter-topics-" + chapterId);
+        const chevron = document.getElementById("chapter-chevron-" + chapterId);
+        const folderIcon = document.getElementById("chapter-icon-" + chapterId);
+        
+        const isCollapsed = container.classList.contains("d-none");
+        
+        if (isCollapsed || forceExpand) {
+            // Expand
+            container.classList.remove("d-none");
+            chevron.className = "fas fa-chevron-up text-muted small ms-2";
+            folderIcon.className = "fas fa-folder-open me-2 text-warning";
+            
+            // Load topics if not loaded
+            if (container.getAttribute("data-loaded") === "false") {
+                loadChapterTopics(chapterId);
+            }
+
+            // Save to StateManager
+            let expanded = StateManager.get("expanded_chapters") || [];
+            if (!expanded.includes(chapterId)) {
+                expanded.push(chapterId);
+                StateManager.save("expanded_chapters", expanded);
+            }
+        } else {
+            // Collapse
+            container.classList.add("d-none");
+            chevron.className = "fas fa-chevron-down text-muted small ms-2";
+            folderIcon.className = "fas fa-folder me-2 text-warning";
+
+            // Remove from StateManager
+            let expanded = StateManager.get("expanded_chapters") || [];
+            expanded = expanded.filter(id => id !== chapterId);
+            StateManager.save("expanded_chapters", expanded);
+        }
+    }
+
+    function loadChapterTopics(chapterId) {
+        const container = document.getElementById("chapter-topics-" + chapterId);
+        container.innerHTML = `
+            <div class="text-center py-2">
+                <span class="spinner-border spinner-border-sm text-primary" role="status"></span>
+                <span class="text-muted small ms-1" style="font-size: 0.75rem;">Loading topics...</span>
+            </div>
+        `;
+        
+        fetch(`/student/study/api/chapter/${chapterId}/topics`)
+        .then(res => res.json())
+        .then(data => {
+            if (data.status === "success") {
+                container.setAttribute("data-loaded", "true");
+                if (data.topics.length === 0) {
+                    container.innerHTML = `<p class="text-muted small ps-3">No topics found.</p>`;
+                    return;
+                }
+                
+                let html = "";
+                data.topics.forEach(topic => {
+                    html += `
+                        <div class="d-flex align-items-center justify-content-between">
+                            <a href="javascript:void(0)" class="topic-link flex-grow-1" id="topic-link-${topic.id}" onclick="loadTopic(${topic.id})">
+                                <i class="far fa-file-alt me-2 text-primary"></i> ${topic.name}
+                            </a>
+                            <div class="form-check me-2">
+                                <input class="form-check-input" type="checkbox" id="chk-topic-${topic.id}" 
+                                       ${topic.completed ? 'checked' : ''} 
+                                       onclick="toggleTopicCompletion(${topic.id}, this)">
+                            </div>
+                        </div>
+                    `;
+                });
+                container.innerHTML = html;
+                
+                // If the active topic link matches one in this chapter, mark it active
+                if (activeTopicId) {
+                    const activeLink = document.getElementById("topic-link-" + activeTopicId);
+                    if (activeLink) {
+                        activeLink.classList.add("active");
+                    }
+                } else if (data.topics.length > 0) {
+                    loadTopic(data.topics[0].id);
+                }
+            } else {
+                container.innerHTML = `<p class="text-danger small ps-3">Failed to load: ${data.message}</p>`;
+            }
+        })
+        .catch(err => {
+            container.innerHTML = `<p class="text-danger small ps-3">Error: ${err}</p>`;
+        });
+    }
+
+    // Switch study room tabs
+    function switchStudyTab(tab) {
+        document.querySelectorAll(".study-tab-btn").forEach(btn => btn.classList.remove("active"));
+        document.querySelectorAll(".tab-content-item").forEach(item => item.classList.add("d-none"));
+        
+        // Find button that matches this tab or use current target if click event
+        let btn = null;
+        if (event && event.currentTarget && event.currentTarget.classList.contains("study-tab-btn")) {
+            btn = event.currentTarget;
+        } else {
+            btn = Array.from(document.querySelectorAll(".study-tab-btn")).find(b => b.getAttribute("onclick").includes(tab));
+        }
+
+        if (btn) {
+            btn.classList.add("active");
+        }
+        document.getElementById("tab-" + tab).classList.remove("d-none");
+
+        // Save to StateManager
+        StateManager.save("active_tab", tab);
+    }
+
+    // AJAX load topic content
+    function loadTopic(topicId) {
+        activeTopicId = topicId;
+        StateManager.save("active_topic_id", topicId);
+        
+        // Find parent chapter ID and save it
+        setTimeout(() => {
+            const link = document.getElementById("topic-link-" + topicId);
+            if (link) {
+                const parentContainer = link.closest("[id^='chapter-topics-']");
+                if (parentContainer) {
+                    const chapterId = parseInt(parentContainer.id.replace("chapter-topics-", ""));
+                    StateManager.save("active_chapter_id", chapterId);
+                }
+            }
+        }, 100);
+        
+        document.querySelectorAll(".topic-link").forEach(link => link.classList.remove("active"));
+        const activeLink = document.getElementById("topic-link-" + topicId);
+        if (activeLink) {
+            activeLink.classList.add("active");
+        }
+        
+        const textbook = document.getElementById("material-textbook");
+        textbook.innerHTML = `
+            <div class="text-center py-5">
+                <div class="spinner-border text-primary" role="status"></div>
+                <p class="text-muted small mt-2">Retrieving educational textbook content...</p>
+            </div>
+        `;
+        
+        fetch(`/student/study/api/topic/${topicId}`)
+        .then(res => res.json())
+        .then(data => {
+            if (data.status === "success") {
+                renderTopicContent(data);
+            } else if (data.status === "not_found") {
+                // Auto-seed: generate AI lesson immediately without user click
+                generateAILesson(topicId);
+            } else {
+                textbook.innerHTML = `<div class="alert alert-danger">${data.message}</div>`;
+            }
+        })
+        .catch(err => {
+            textbook.innerHTML = `<div class="alert alert-danger">Error loading topic: ${err}</div>`;
+        });
+    }
+
+    function generateAILesson(topicId) {
+        const textbook = document.getElementById("material-textbook");
+        textbook.innerHTML = `
+            <div class="text-center py-5">
+                <div class="spinner-grow mb-3" style="width:3rem;height:3rem;color:#a78bfa;" role="status"></div>
+                <h5 class="fw-bold text-gradient mb-2" id="ai-loading-text">Analyzing syllabus curriculum guidelines...</h5>
+                <p class="text-muted small mt-2">SmartStudy AI is composing your lesson — textbook notes, worked examples, MCQs &amp; flashcards.</p>
+                <div class="progress mt-3 mx-auto" style="max-width:320px;height:6px;background:rgba(255,255,255,0.08);">
+                    <div class="progress-bar progress-bar-striped progress-bar-animated" style="width:100%;background:linear-gradient(135deg,#667eea,#764ba2);"></div>
+                </div>
+            </div>
+        `;
+        
+        const messages = [
+            "Analyzing syllabus curriculum guidelines...",
+            "Composing detailed textbook explanations...",
+            "Solving step-by-step worked practice exercises...",
+            "Drafting mock multiple-choice quiz questions...",
+            "Generating interactive active recall flashcards...",
+            "Saving lesson plan and seeding curriculum structures..."
+        ];
+        let msgIdx = 0;
+        const msgTimer = setInterval(() => {
+            msgIdx = (msgIdx + 1) % messages.length;
+            const loadingText = document.getElementById("ai-loading-text");
+            if (loadingText) loadingText.innerText = messages[msgIdx];
+        }, 2500);
+
+        fetch(`/student/study/api/topic/${topicId}/generate-ai`, {
+            method: "POST"
+        })
+        .then(res => res.json())
+        .then(data => {
+            clearInterval(msgTimer);
+            if (data.status === "success") {
+                renderTopicContent(data);
+            } else {
+                // Show retry button on failure
+                textbook.innerHTML = `
+                    <div class="text-center py-5">
+                        <i class="fas fa-exclamation-circle fa-3x text-warning mb-3"></i>
+                        <h5 class="text-white">AI generation failed</h5>
+                        <p class="text-muted small">${data.message || 'Please check your API key in .env'}</p>
+                        <button class="btn btn-outline-primary" onclick="generateAILesson(${topicId})">
+                            <i class="fas fa-redo me-1"></i> Retry
+                        </button>
+                    </div>`;
+            }
+        })
+        .catch(err => {
+            clearInterval(msgTimer);
+            textbook.innerHTML = `
+                <div class="text-center py-5">
+                    <i class="fas fa-wifi fa-3x text-danger mb-3"></i>
+                    <h5 class="text-white">Connection error</h5>
+                    <p class="text-muted small">${err}</p>
+                    <button class="btn btn-outline-primary" onclick="generateAILesson(${topicId})">
+                        <i class="fas fa-redo me-1"></i> Retry
+                    </button>
+                </div>`;
+        });
+    }
+
+    function renderTopicContent(data, topicId) {
+        topicId = topicId || activeTopicId;
+        const textbook = document.getElementById("material-textbook");
+        const m = data.material;
+        let diagram_html = "";
+        if (m.diagrams) {
+            diagram_html = `
+                <div class="p-3 my-3 border rounded-3 bg-dark text-white font-monospace" style="white-space: pre; border-color: rgba(255,255,255,0.05) !important;">
+                    <i class="fas fa-project-diagram text-primary me-2 mb-2"></i>Diagram / Architecture Layout:\n${m.diagrams}
+                </div>
+            `;
+        }
+        
+        textbook.innerHTML = `
+            <h3 class="fw-bold mb-1 text-gradient">${m.title}</h3>
+            <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+                <div class="d-flex align-items-center gap-2">
+                    <span class="badge bg-secondary text-dark">${m.difficulty_level.toUpperCase()} DIFFICULTY</span>
+                    <span class="badge bg-low"><i class="far fa-clock me-1"></i> ${m.estimated_reading_time} mins read</span>
+                </div>
+                <div class="d-flex gap-2">
+                    <button class="btn btn-sm ${data.bookmarked ? 'btn-warning text-white' : 'btn-outline-warning'}" id="btn-bookmark-${topicId}" onclick="toggleBookmark(${topicId})">
+                        <i class="${data.bookmarked ? 'fas' : 'far'} fa-star me-1"></i> ${data.bookmarked ? 'Bookmarked' : 'Bookmark'}
+                    </button>
+                    <button class="btn btn-sm ${data.progress_status === 'completed' ? 'btn-success' : 'btn-outline-success'}" id="btn-read-${topicId}" onclick="toggleReadStatus(${topicId})">
+                        <i class="fas fa-check-circle me-1"></i> ${data.progress_status === 'completed' ? 'Read' : 'Mark as Read'}
+                    </button>
+                </div>
+            </div>
+
+            <div class="d-flex gap-2 mb-4 flex-wrap">
+                <button class="btn btn-sm btn-outline-primary" onclick="downloadPDF(${topicId})">
+                    <i class="fas fa-file-pdf me-1"></i> Download PDF
+                </button>
+                <button class="btn btn-sm btn-outline-info" id="btn-tts" onclick="speakTopicText(${topicId})">
+                    <i class="fas fa-volume-up me-1"></i> Listen
+                </button>
+                <button class="btn btn-sm btn-outline-purple" onclick="startChapterQuiz(${topicId})">
+                    <i class="fas fa-brain me-1"></i> Take AI Chapter Quiz
+                </button>
+            </div>
+
+            <div class="textbook-section my-4">
+                <h5 class="text-gradient fw-bold"><i class="fas fa-bullseye me-2"></i> Learning Objectives</h5>
+                <div>${m.learning_objectives || "No objectives defined."}</div>
+            </div>
+            
+            <hr class="opacity-10">
+
+            <div class="textbook-section my-4">
+                <h5 class="text-gradient fw-bold"><i class="fas fa-file-alt me-2"></i> Introduction</h5>
+                <div>${m.introduction || "No introduction."}</div>
+            </div>
+
+            <div class="textbook-section my-4">
+                <h5 class="text-gradient fw-bold"><i class="fas fa-book-open me-2"></i> Detailed Explanation</h5>
+                <div>${m.detailed_explanation || "No explanation."}</div>
+            </div>
+
+            <div class="row my-4 g-3">
+                <div class="col-md-6">
+                    <div class="p-3 rounded-3 h-100" style="background: rgba(255, 255, 255, 0.02); border: 1px solid rgba(255,255,255,0.05);">
+                        <h6 class="text-gradient fw-bold"><i class="fas fa-info-circle me-1"></i> Key Definitions</h6>
+                        <div>${m.important_definitions || "No definitions."}</div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="p-3 rounded-3 h-100" style="background: rgba(255, 255, 255, 0.02); border: 1px solid rgba(255,255,255,0.05);">
+                        <h6 class="text-gradient fw-bold"><i class="fas fa-brain me-1"></i> Core Concepts</h6>
+                        <div>${m.concepts || "No core concepts."}</div>
+                    </div>
+                </div>
+            </div>
+
+            ${diagram_html}
+
+            <div class="textbook-section my-4">
+                <h5 class="text-gradient fw-bold"><i class="fas fa-clipboard-list me-2"></i> Worked Examples</h5>
+                <div>${m.worked_examples || "No worked examples."}</div>
+            </div>
+
+            <div class="row my-4 g-3">
+                <div class="col-md-6">
+                    <div class="p-3 rounded-3 h-100" style="background: rgba(52, 211, 153, 0.05); border: 1px solid rgba(52, 211, 153, 0.1);">
+                        <h6 class="text-success fw-bold"><i class="fas fa-network-wired me-1"></i> Real-Life Application</h6>
+                        <div>${m.real_life_applications || "No real-life applications."}</div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="p-3 rounded-3 h-100" style="background: rgba(248, 113, 113, 0.05); border: 1px solid rgba(248, 113, 113, 0.1);">
+                        <h6 class="text-danger fw-bold"><i class="fas fa-exclamation-circle me-1"></i> Common Mistakes to Avoid</h6>
+                        <div>${m.common_mistakes || "No common mistakes recorded."}</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="textbook-section my-4">
+                <h5 class="text-gradient fw-bold"><i class="fas fa-star me-2"></i> Key Summary & Revision Guide</h5>
+                <div>${m.summary || "No summary."}</div>
+            </div>
+
+            <!-- Chapter Notes Textarea -->
+            <div class="mt-5 p-3 rounded-3 text-start" style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05);">
+                <h5 class="text-gradient fw-bold mb-2"><i class="fas fa-sticky-note me-2"></i> Chapter Notes</h5>
+                <p class="text-muted small">Write down your key takeaways or formulas for this chapter. Automatically saved on blur.</p>
+                <textarea class="form-control bg-dark text-white border-secondary mb-2" id="chapter-notes-textarea" rows="4" placeholder="Write your notes here..." onblur="saveChapterNotes(${topicId})">${data.notes_content || ''}</textarea>
+                <div class="d-flex justify-content-end">
+                    <button class="btn btn-sm btn-primary" onclick="saveChapterNotes(${topicId})"><i class="fas fa-save me-1"></i> Save Notes</button>
+                </div>
+            </div>
+
+            <!-- Related Past Questions -->
+            <div class="mt-4 p-3 rounded-3 text-start" style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05);">
+                <h5 class="text-gradient fw-bold mb-2"><i class="fas fa-history me-2"></i> Related NEB Past Questions</h5>
+                <ul class="list-group list-group-flush bg-transparent" id="past-questions-list">
+                    ${data.past_questions && data.past_questions.length > 0 ? 
+                        data.past_questions.map(q => `
+                            <li class="list-group-item bg-transparent text-white border-secondary d-flex justify-content-between align-items-center">
+                                <span>${q.question_text}</span>
+                                <span class="badge bg-secondary text-dark">${q.exam_year || 'Any Year'}</span>
+                            </li>
+                        `).join("") : 
+                        `<li class="list-group-item bg-transparent text-muted border-0">No past questions registered for this topic yet.</li>`
+                    }
+                </ul>
+            </div>
+        `;
+
+        // Populate Practice Tab
+        const pContainer = document.getElementById("material-practice-content");
+        let short_qs = [];
+        let long_qs = [];
+        let critical_qs = [];
+        try {
+            short_qs = JSON.parse(m.short_questions_json || "[]");
+            long_qs = JSON.parse(m.long_questions_json || "[]");
+            critical_qs = JSON.parse(m.critical_thinking_questions_json || "[]");
+        } catch(e) {}
+        
+        let practice_html = "";
+        if (short_qs.length > 0) {
+            practice_html += `
+                <h5 class="fw-bold mt-4 mb-2" style="color: var(--blue);"><i class="fas fa-question-circle me-2"></i> Short Answer Questions</h5>
+                <ul class="list-group list-group-flush bg-transparent">
+                    ${short_qs.map(q => `<li class="list-group-item bg-transparent text-white border-secondary">${q}</li>`).join("")}
+                </ul>
+            `;
+        }
+        if (long_qs.length > 0) {
+            practice_html += `
+                <h5 class="fw-bold mt-4 mb-2" style="color: var(--purple);"><i class="fas fa-file-alt me-2"></i> Long Analytical Questions</h5>
+                <ul class="list-group list-group-flush bg-transparent">
+                    ${long_qs.map(q => `<li class="list-group-item bg-transparent text-white border-secondary">${q}</li>`).join("")}
+                </ul>
+            `;
+        }
+        if (critical_qs.length > 0) {
+            practice_html += `
+                <h5 class="fw-bold mt-4 mb-2" style="color: var(--amber);"><i class="fas fa-lightbulb me-2"></i> Critical Thinking Challenges</h5>
+                <ul class="list-group list-group-flush bg-transparent">
+                    ${critical_qs.map(q => `<li class="list-group-item bg-transparent text-white border-secondary">${q}</li>`).join("")}
+                </ul>
+            `;
+        }
+        pContainer.innerHTML = practice_html || "<p class='text-muted'>No practice exercises defined for this topic.</p>";
+
+        // Populate Quiz Tab
+        const qContainer = document.getElementById("material-quiz-content");
+        let mcqs = [];
+        try {
+            mcqs = JSON.parse(m.mcqs_json || "[]");
+        } catch(e) {}
+        document.getElementById("quiz-alert-container").innerHTML = ""; // clear alerts
+        
+        if (mcqs.length > 0) {
+            let quiz_html = "";
+            mcqs.forEach((q, q_idx) => {
+                quiz_html += `
+                    <div class="mb-4 p-3 rounded-3" style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05);">
+                        <h6 class="fw-bold text-white mb-3">Q${q_idx+1}: ${q.q}</h6>
+                        <div class="d-flex flex-column gap-2">
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="answers_${q_idx}" value="A" id="q_${q_idx}_a" required>
+                                <label class="form-check-label text-muted" for="q_${q_idx}_a"><strong>A.</strong> ${q.a}</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="answers_${q_idx}" value="B" id="q_${q_idx}_b">
+                                <label class="form-check-label text-muted" for="q_${q_idx}_b"><strong>B.</strong> ${q.b}</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="answers_${q_idx}" value="C" id="q_${q_idx}_c">
+                                <label class="form-check-label text-muted" for="q_${q_idx}_c"><strong>C.</strong> ${q.c}</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="answers_${q_idx}" value="D" id="q_${q_idx}_d">
+                                <label class="form-check-label text-muted" for="q_${q_idx}_d"><strong>D.</strong> ${q.d}</label>
+                            </div>
+                        </div>
+                        <div class="explanation-box d-none mt-3 p-2 rounded bg-info bg-opacity-10 text-white small" id="exp_${q_idx}"></div>
+                    </div>
+                `;
+            });
+            quiz_html += `<button type="submit" class="btn btn-primary w-100 py-3 mt-2" id="submit-quiz-btn"><i class="fas fa-check-circle me-1"></i> Submit Quiz</button>`;
+            qContainer.innerHTML = quiz_html;
+        } else {
+            qContainer.innerHTML = "<p class='text-muted'>No quiz questions defined for this topic.</p>";
+        }
+
+        // Render local topic flashcards if any
+        if (data.flashcards && data.flashcards.length > 0) {
+            flashcardsData = data.flashcards;
+            currentFlashcardIdx = 0;
+            renderFlashcard();
+        }
+    }
+
+    // Toggle completion checkbox
+    function toggleTopicCompletion(topicId, checkbox) {
+        const formData = new FormData();
+        formData.append("topic_id", topicId);
+        formData.append("completed", checkbox.checked);
+        
+        fetch("/student/study/toggle-topic", {
+            method: "POST",
+            body: formData
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.status === "success") {
+                console.log(`Topic completion toggled: ${data.completed}`);
+            }
+        })
+        .catch(err => console.error("Error toggling completion:", err));
+    }
+
+    // Submit Quiz & Grade
+    function submitQuiz(event) {
+        event.preventDefault();
+        
+        const submitBtn = document.getElementById("submit-quiz-btn");
+        if(submitBtn) submitBtn.disabled = true;
+        
+        const answers = [];
+        const checkedOptions = document.querySelectorAll('#topic-quiz-form input[type="radio"]:checked');
+        checkedOptions.forEach(opt => {
+            answers.push(opt.value);
+        });
+        
+        const formData = new FormData();
+        formData.append("topic_id", activeTopicId);
+        answers.forEach(ans => {
+            formData.append("answers[]", ans);
+        });
+        
+        fetch("/student/study/submit-quiz", {
+            method: "POST",
+            body: formData
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.status === "success") {
+                // Render grades
+                const alertContainer = document.getElementById("quiz-alert-container");
+                alertContainer.innerHTML = `
+                    <div class="alert alert-success">
+                        <h5>Quiz Completed!</h5>
+                        <p class="mb-0">Your Score: <strong>${data.correct_count} / ${data.total} (${data.score_pct}%)</strong></p>
+                    </div>
+                `;
+                
+                // Show explanations and highlight answers
+                data.results.forEach((r, idx) => {
+                    const expDiv = document.getElementById(`exp_${idx}`);
+                    if(expDiv) {
+                        expDiv.classList.remove("d-none");
+                        expDiv.innerHTML = `
+                            <strong>Correct Answer: ${r.correct_ans}</strong><br>
+                            ${r.explanation}
+                        `;
+                    }
+                });
+            } else {
+                alert("Error grading quiz: " + data.message);
+                if(submitBtn) submitBtn.disabled = false;
+            }
+        })
+        .catch(err => {
+            console.error("Quiz submission error:", err);
+            if(submitBtn) submitBtn.disabled = false;
+        });
+    }
+
+    // Flashcard Render
+    function renderFlashcard() {
+        const cardQ = document.getElementById("flashcard-q");
+        const cardA = document.getElementById("flashcard-a");
+        const cardBox = document.getElementById("flashcard");
+        const countDisplay = document.getElementById("flashcard-count");
+        
+        cardBox.classList.remove("flipped"); // ensure reset flip
+        
+        if (flashcardsData.length > 0) {
+            const f = flashcardsData[currentFlashcardIdx];
+            cardQ.innerText = f.front;
+            cardA.innerText = f.back;
+            countDisplay.innerText = `Card ${currentFlashcardIdx + 1} / ${flashcardsData.length}`;
+        } else {
+            cardQ.innerText = "No flashcards available.";
+            cardA.innerText = "No explanation.";
+            countDisplay.innerText = "Card 0 / 0";
+        }
+    }
+    
+    function nextFlashcard() {
+        if(flashcardsData.length === 0) return;
+        currentFlashcardIdx = (currentFlashcardIdx + 1) % flashcardsData.length;
+        renderFlashcard();
+    }
+    
+    function prevFlashcard() {
+        if(flashcardsData.length === 0) return;
+        currentFlashcardIdx = (currentFlashcardIdx - 1 + flashcardsData.length) % flashcardsData.length;
+        renderFlashcard();
+    }
+
+    // Auto-save Notes Logic
+    const notesTextarea = document.getElementById("notes-content");
+    const saveIndicator = document.getElementById("save-indicator");
+    let typingTimer;
+    
+    if (notesTextarea) {
+        notesTextarea.addEventListener("input", function() {
+            clearTimeout(typingTimer);
+            typingTimer = setTimeout(saveNotes, 1500); // save after 1.5 seconds of silence
+        });
+    }
+    
+    function saveNotes() {
+        const content = notesTextarea.value;
+        const formData = new FormData();
+        formData.append("subject_id", "{{ subject.id }}");
+        formData.append("notes_content", content);
+        
+        fetch("/student/study/save-notes", {
+            method: "POST",
+            body: formData
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.status === "success") {
+                saveIndicator.classList.remove("d-none");
+                setTimeout(() => { saveIndicator.classList.add("d-none"); }, 2000);
+            }
+        })
+        .catch(err => console.error("Error saving notes:", err));
+    }
+
+    // Keyboard navigation for flashcards
+    document.addEventListener("keydown", function(e) {
+        const flashcardTab = document.getElementById("tab-flashcards");
+        if (flashcardTab && !flashcardTab.classList.contains("d-none")) {
+            if (e.key === "ArrowRight" || e.key === "n") nextFlashcard();
+            if (e.key === "ArrowLeft"  || e.key === "p") prevFlashcard();
+            if (e.key === " " || e.key === "f") {
+                e.preventDefault();
+                document.getElementById("flashcard")?.classList.toggle("flipped");
+            }
+        }
+    });
+
+    // ── NEW STUDY MATERIAL FUNCTIONS ─────────────────────────────────────────
+
+    // Bookmarking
+    function toggleBookmark(topicId) {
+        fetch(`/student/study/api/topic/${topicId}/bookmark`, { method: "POST" })
+        .then(res => res.json())
+        .then(data => {
+            if (data.status === "success") {
+                const btn = document.getElementById(`btn-bookmark-${topicId}`);
+                if (btn) {
+                    if (data.bookmarked) {
+                        btn.className = "btn btn-sm btn-warning text-white";
+                        btn.innerHTML = `<i class="fas fa-star me-1"></i> Bookmarked`;
+                    } else {
+                        btn.className = "btn btn-sm btn-outline-warning";
+                        btn.innerHTML = `<i class="far fa-star me-1"></i> Bookmark`;
+                    }
+                }
+            }
+        });
+    }
+
+    // Toggle Read Status (button click)
+    function toggleReadStatus(topicId) {
+        const btn = document.getElementById(`btn-read-${topicId}`);
+        const isCompleted = btn.classList.contains("btn-success");
+        const newStatus = isCompleted ? "in progress" : "completed";
+        
+        const formData = new FormData();
+        formData.append("status", newStatus);
+        
+        fetch(`/student/study/api/topic/${topicId}/mark-read`, {
+            method: "POST",
+            body: formData
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.status === "success") {
+                const chk = document.getElementById(`chk-topic-${topicId}`);
+                if (chk) {
+                    chk.checked = (newStatus === "completed");
+                }
+                if (newStatus === "completed") {
+                    btn.className = "btn btn-sm btn-success";
+                    btn.innerHTML = `<i class="fas fa-check-circle me-1"></i> Read`;
+                } else {
+                    btn.className = "btn btn-sm btn-outline-success";
+                    btn.innerHTML = `<i class="fas fa-check-circle me-1"></i> Mark as Read`;
+                }
+            }
+        });
+    }
+
+    // Override the toggleTopicCompletion to sync with ReviewedChapter
+    const originalToggleTopicCompletion = toggleTopicCompletion;
+    toggleTopicCompletion = function(topicId, checkbox) {
+        const status = checkbox.checked ? "completed" : "not started";
+        const formData = new FormData();
+        formData.append("status", status);
+        
+        fetch(`/student/study/api/topic/${topicId}/mark-read`, {
+            method: "POST",
+            body: formData
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.status === "success") {
+                if (activeTopicId === topicId) {
+                    const btn = document.getElementById(`btn-read-${topicId}`);
+                    if (btn) {
+                        if (status === "completed") {
+                            btn.className = "btn btn-sm btn-success";
+                            btn.innerHTML = `<i class="fas fa-check-circle me-1"></i> Read`;
+                        } else {
+                            btn.className = "btn btn-sm btn-outline-success";
+                            btn.innerHTML = `<i class="fas fa-check-circle me-1"></i> Mark as Read`;
+                        }
+                    }
+                }
+            }
+        });
+    };
+
+    // PDF Download & Loading State
+    function downloadPDF(topicId) {
+        const overlay = document.getElementById("pdf-loading-overlay");
+        overlay.classList.remove("d-none");
+        
+        fetch(`/student/study/api/topic/${topicId}/pdf`)
+        .then(response => {
+            if (!response.ok) throw new Error("Could not fetch PDF");
+            return response.blob();
+        })
+        .then(blob => {
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.style.display = "none";
+            a.href = url;
+            a.download = `chapter_${topicId}.pdf`;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            overlay.classList.add("d-none");
+        })
+        .catch(err => {
+            overlay.classList.add("d-none");
+            alert("Error downloading PDF: " + err.message);
+        });
+    }
+
+    // Text-To-Speech
+    let ttsUtterance = null;
+    function speakTopicText(topicId) {
+        const btn = document.getElementById("btn-tts");
+        if (window.speechSynthesis.speaking) {
+            window.speechSynthesis.cancel();
+            btn.className = "btn btn-sm btn-outline-info";
+            btn.innerHTML = `<i class="fas fa-volume-up me-1"></i> Listen`;
+            return;
+        }
+        
+        fetch(`/student/study/api/topic/${topicId}/tts`, { method: "POST" });
+        
+        const explanationDiv = document.getElementById("material-textbook");
+        if (!explanationDiv) return;
+        
+        const textToSpeak = explanationDiv.innerText;
+        ttsUtterance = new SpeechSynthesisUtterance(textToSpeak);
+        ttsUtterance.rate = 1.0;
+        
+        ttsUtterance.onend = function() {
+            btn.className = "btn btn-sm btn-outline-info";
+            btn.innerHTML = `<i class="fas fa-volume-up me-1"></i> Listen`;
+        };
+        
+        btn.className = "btn btn-sm btn-danger";
+        btn.innerHTML = `<i class="fas fa-stop me-1"></i> Stop Listening`;
+        
+        window.speechSynthesis.speak(ttsUtterance);
+    }
+
+    // Save Chapter Notes
+    function saveChapterNotes(topicId) {
+        const textarea = document.getElementById("chapter-notes-textarea");
+        if (!textarea) return;
+        
+        const formData = new FormData();
+        formData.append("content", textarea.value);
+        
+        fetch(`/student/study/api/topic/${topicId}/notes`, {
+            method: "POST",
+            body: formData
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.status === "success") {
+                console.log("Notes autosaved.");
+            }
+        });
+    }
+
+    // Chapter Quiz
+    let currentChapterQuizQuestions = [];
+    let currentQuizTopicId = null;
+    
+    function startChapterQuiz(topicId) {
+        currentQuizTopicId = topicId;
+        const loading = document.getElementById("chapter-quiz-loading");
+        const content = document.getElementById("chapter-quiz-content");
+        const submitBtn = document.getElementById("btn-submit-chapter-quiz");
+        
+        loading.classList.remove("d-none");
+        content.classList.add("d-none");
+        submitBtn.disabled = true;
+        
+        const quizModalEl = document.getElementById('chapterQuizModal');
+        const modal = new bootstrap.Modal(quizModalEl);
+        modal.show();
+        
+        fetch(`/student/study/api/topic/${topicId}/generate-quiz`)
+        .then(res => res.json())
+        .then(data => {
+            loading.classList.add("d-none");
+            content.classList.remove("d-none");
+            submitBtn.disabled = false;
+            
+            if (data.status === "success" && data.quiz && data.quiz.length > 0) {
+                currentChapterQuizQuestions = data.quiz;
+
+                // Show degraded banner if AI was unavailable
+                const degradedBanner = document.getElementById("quiz-degraded-banner");
+                if (degradedBanner) {
+                    if (data.degraded) {
+                        degradedBanner.classList.remove("d-none");
+                        degradedBanner.textContent = data.message || "Limited connectivity — showing a standard practice quiz.";
+                    } else {
+                        degradedBanner.classList.add("d-none");
+                    }
+                }
+
+                let html = "";
+                data.quiz.forEach((q, idx) => {
+                    html += `
+                        <div class="mb-4 text-start text-white">
+                            <h6 class="fw-bold mb-2">Q${idx+1}: ${q.q}</h6>
+                            <div class="form-check mb-1">
+                                <input class="form-check-input text-white" type="radio" name="chapter_q_${idx}" value="A" id="cq_${idx}_a">
+                                <label class="form-check-label text-muted" for="cq_${idx}_a"><strong>A.</strong> ${q.a}</label>
+                            </div>
+                            <div class="form-check mb-1">
+                                <input class="form-check-input text-white" type="radio" name="chapter_q_${idx}" value="B" id="cq_${idx}_b">
+                                <label class="form-check-label text-muted" for="cq_${idx}_b"><strong>B.</strong> ${q.b}</label>
+                            </div>
+                            <div class="form-check mb-1">
+                                <input class="form-check-input text-white" type="radio" name="chapter_q_${idx}" value="C" id="cq_${idx}_c">
+                                <label class="form-check-label text-muted" for="cq_${idx}_c"><strong>C.</strong> ${q.c}</label>
+                            </div>
+                            <div class="form-check mb-1">
+                                <input class="form-check-input text-white" type="radio" name="chapter_q_${idx}" value="D" id="cq_${idx}_d">
+                                <label class="form-check-label text-muted" for="cq_${idx}_d"><strong>D.</strong> ${q.d}</label>
+                            </div>
+                            <div class="cq-exp-box d-none mt-2 p-2 rounded bg-info bg-opacity-10 text-white small" id="cq-exp-${idx}"></div>
+                        </div>
+                    `;
+                });
+                content.innerHTML = html;
+            } else {
+                content.innerHTML = `<p class="text-danger">Failed to generate quiz questions.</p>`;
+                submitBtn.disabled = true;
+            }
+        });
+    }
+
+    function submitChapterQuiz() {
+        let correctCount = 0;
+        const total = currentChapterQuizQuestions.length;
+        const questionResults = [];
+        
+        currentChapterQuizQuestions.forEach((q, idx) => {
+            const selected = document.querySelector(`input[name="chapter_q_${idx}"]:checked`);
+            const ans = selected ? selected.value : "";
+            const isCorrect = (ans === q.ans);
+
+            const expBox = document.getElementById(`cq-exp-${idx}`);
+            if (expBox) {
+                expBox.classList.remove("d-none");
+                expBox.innerHTML = `<strong>Correct Answer: ${q.ans}</strong>. ${q.exp}`;
+            }
+            
+            if (isCorrect) correctCount++;
+
+            // Collect per-question result for server persistence
+            questionResults.push({
+                q: q.q,
+                ans: q.ans,
+                selected: ans,
+                correct: isCorrect
+            });
+        });
+        
+        const formData = new FormData();
+        formData.append("score", correctCount);
+        formData.append("total", total);
+        formData.append("questions", JSON.stringify(questionResults));
+        
+        fetch(`/student/study/api/topic/${currentQuizTopicId}/submit-quiz`, {
+            method: "POST",
+            body: formData
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.status === "success") {
+                const submitBtn = document.getElementById("btn-submit-chapter-quiz");
+                submitBtn.disabled = true;
+                alert(`Quiz submitted! Score: ${correctCount} / ${total}`);
+            }
+        });
+    }
+
+    function loadSyllabusCoverage() {
+        const container = document.getElementById("coverage-content");
+        container.innerHTML = '<div class="text-center py-4 text-muted"><i class="fas fa-spinner fa-spin me-2"></i> Analyzing syllabus coverage...</div>';
+        
+        fetch(`/student/subjects/{{ subject.id }}/coverage`)
+        .then(res => res.json())
+        .then(data => {
+            if (data.status === "success" && data.coverage && data.coverage.length > 0) {
+                let coveredCount = data.coverage.filter(c => c.covered).length;
+                let totalCount = data.coverage.length;
+                let pct = Math.round((coveredCount / totalCount) * 100);
+
+                let html = `
+                    <div class="row align-items-center mb-4 g-3">
+                        <div class="col-md-4 text-center">
+                            <div class="p-3 rounded-3 bg-dark border border-secondary">
+                                <div class="fs-1 fw-bold text-gradient">${pct}%</div>
+                                <div class="text-muted small">Syllabus Covered</div>
+                            </div>
+                        </div>
+                        <div class="col-md-8">
+                            <div class="progress mb-2" style="height: 12px; background: rgba(255,255,255,0.08);">
+                                <div class="progress-bar bg-success" style="width: ${pct}%;"></div>
+                            </div>
+                            <small class="text-muted">${coveredCount} of ${totalCount} topics backed by uploaded study materials</small>
+                        </div>
+                    </div>
+                    <div class="list-group list-group-flush">
+                `;
+
+                data.coverage.forEach(item => {
+                    let badge = item.covered 
+                        ? `<span class="badge bg-success bg-opacity-20 text-success"><i class="fas fa-check me-1"></i> Covered (${item.file_count} chunks)</span>`
+                        : `<span class="badge bg-danger bg-opacity-20 text-danger"><i class="fas fa-times me-1"></i> Coverage Gap</span>`;
+                    html += `
+                        <div class="list-group-item bg-dark border-secondary text-white d-flex justify-content-between align-items-center">
+                            <div>
+                                <span class="fw-bold">${item.topic}</span>
+                                <div class="small text-muted font-monospace">Sim score: ${(item.max_similarity * 100).toFixed(1)}%</div>
+                            </div>
+                            ${badge}
+                        </div>
+                    `;
+                });
+
+                html += `</div>`;
+                container.innerHTML = html;
+            } else {
+                container.innerHTML = `
+                    <div class="text-center py-5 text-muted">
+                        <i class="fas fa-file-invoice fa-3x mb-3 opacity-30"></i>
+                        <h5>No Module Descriptor Found</h5>
+                        <p class="small mb-0">Upload a Module Descriptor document in your zip upload to generate automatic syllabus gap analysis!</p>
+                    </div>
+                `;
+            }
+        })
+        .catch(err => {
+            container.innerHTML = `<div class="alert alert-danger">Error loading coverage data: ${err}</div>`;
+        });
+    }
+
+    function loadModuleInfo() {
+        const container = document.getElementById("module-info-content");
+        container.innerHTML = '<div class="text-center py-4 text-muted"><i class="fas fa-spinner fa-spin me-2"></i> Loading course information...</div>';
+
+        fetch(`/student/subjects/{{ subject.id }}/module-info`)
+        .then(res => res.json())
+        .then(data => {
+            if (data.status === "success" && data.module_descriptor) {
+                let md = data.module_descriptor;
+                let html = `
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-6">
+                            <div class="p-3 rounded-3 bg-dark border border-secondary">
+                                <div class="text-muted small mb-1"><i class="fas fa-file-alt text-primary me-1"></i> Final Exam</div>
+                                <div class="fs-5 fw-bold text-white">${md.has_final_exam ? 'Yes' : 'No'} (${md.exam_weight_pct || 0}%)</div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="p-3 rounded-3 bg-dark border border-secondary">
+                                <div class="text-muted small mb-1"><i class="fas fa-tasks text-warning me-1"></i> Coursework Weight</div>
+                                <div class="fs-5 fw-bold text-white">${md.coursework_weight_pct || 0}%</div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+
+                if (md.assessment_dates && md.assessment_dates.length > 0) {
+                    html += `<h6 class="fw-bold text-white mb-2">Assessment Schedule</h6><ul class="list-group mb-4">`;
+                    md.assessment_dates.forEach(ad => {
+                        html += `<li class="list-group-item bg-dark border-secondary text-white d-flex justify-content-between">
+                            <span>${ad.type || 'Assessment'}</span>
+                            <span class="badge bg-primary">${ad.date || 'TBD'} (${ad.weight_pct || 0}%)</span>
+                        </li>`;
+                    });
+                    html += `</ul>`;
+                }
+
+                container.innerHTML = html;
+            } else {
+                container.innerHTML = `
+                    <div class="text-center py-5 text-muted">
+                        <i class="fas fa-info-circle fa-3x mb-3 opacity-30"></i>
+                        <h5>No Course Info Available</h5>
+                        <p class="small mb-0">Upload a Module Descriptor PDF/DOCX to automatically parse grading criteria and exam schedules!</p>
+                    </div>
+                `;
+            }
+        })
+        .catch(err => {
+            container.innerHTML = `<div class="alert alert-danger">Error loading module info: ${err}</div>`;
+        });
+    }
+
+    // Page Load: auto-load first topic or restore state
+    document.addEventListener("DOMContentLoaded", function() {
+        // Restore active tab
+        const savedTab = StateManager.get("active_tab");
+        if (savedTab) {
+            switchStudyTab(savedTab);
+        }
+
+        // Restore expanded chapters
+        const savedChapters = StateManager.get("expanded_chapters") || [];
+        savedChapters.forEach(chId => {
+            toggleChapter(parseInt(chId), true);
+        });
+
+        // Restore active topic / chapter
+        const savedTopicId = StateManager.get("active_topic_id");
+        const savedChapterId = StateManager.get("active_chapter_id");
+        
+        const initialTopicId = savedTopicId || "{{ active_topic_id or '' }}";
+        const initialChapterId = savedChapterId || "{{ active_chapter_id or '' }}";
+        
+        if (initialTopicId && initialChapterId) {
+            toggleChapter(parseInt(initialChapterId), true);
+            loadTopic(parseInt(initialTopicId));
+        } else {
+            // Auto-expand first chapter in list
+            const firstChapter = document.querySelector("[onclick^='toggleChapter']");
+            if (firstChapter) {
+                const match = firstChapter.getAttribute("onclick").match(/\d+/);
+                if (match) {
+                    toggleChapter(parseInt(match[0]));
+                }
+            }
+        }
+        renderFlashcard();
+    });
+</script>
+
+<!-- ── RAG AI Study Assistant Floating Button & Offcanvas Drawer ── -->
+<div id="rag-chat-fab-container" style="position: fixed; bottom: 24px; right: 24px; z-index: 1040; transition: opacity 0.25s ease, transform 0.25s ease;">
+    <button type="button" class="btn btn-primary rounded-circle shadow-lg d-flex align-items-center justify-content-center" id="rag-chat-toggle-btn" data-bs-toggle="offcanvas" data-bs-target="#ragChatOffcanvas" style="width: 60px; height: 60px; background: linear-gradient(135deg, #6366f1, #8b5cf6); border: 2px solid rgba(255, 255, 255, 0.25); box-shadow: 0 10px 25px rgba(99, 102, 241, 0.45);" title="Ask AI Study Assistant" aria-label="Ask AI Study Assistant">
+        <i class="fas fa-robot fa-lg text-white"></i>
+    </button>
+</div>
+
+<!-- Offcanvas Chat Drawer -->
+<div class="offcanvas offcanvas-end bg-dark text-white border-start border-secondary shadow-lg" tabindex="-1" id="ragChatOffcanvas" style="width: 440px; max-width: 100vw; height: 100vh;">
+    <div class="offcanvas-header border-bottom border-secondary py-3 px-3 flex-shrink-0" style="background: #1e293b;">
+        <div class="d-flex align-items-center gap-3 min-w-0">
+            <div class="rounded-circle p-2 d-flex align-items-center justify-content-center flex-shrink-0 shadow-sm" style="background: linear-gradient(135deg, #6366f1, #8b5cf6); width: 42px; height: 42px; border: 1.5px solid rgba(255, 255, 255, 0.25); box-shadow: 0 4px 12px rgba(99, 102, 241, 0.35);">
+                <i class="fas fa-sparkles text-white" style="font-size: 1.1rem;"></i>
+            </div>
+            <div class="min-w-0">
+                <h6 class="offcanvas-title fw-bold mb-0 text-white" style="font-size: 1rem; letter-spacing: -0.01em;">AI Study Assistant</h6>
+                <small class="text-white-50" style="font-size: 0.76rem;">Your personal AI tutor</small>
+            </div>
+        </div>
+        <button type="button" class="btn-close btn-close-white opacity-75" data-bs-dismiss="offcanvas" aria-label="Close AI Study Assistant" style="font-size: 0.85rem;"></button>
+    </div>
+    
+    <div class="offcanvas-body p-0 d-flex flex-column" style="background: #0f172a; height: 100%; overflow: hidden;">
+        <!-- Hidden active subject ID context -->
+        <input type="hidden" id="rag-active-subject-id" value="{{ subject.id }}">
+
+        <!-- Scrollable Chat History Container -->
+        <div id="rag-chat-messages" class="flex-grow-1 p-3 d-flex flex-column gap-2" style="overflow-y: auto; min-height: 0; background: #0f172a;">
+            <div id="rag-chat-empty-state" class="text-center py-4 px-3 my-auto text-muted">
+                <div class="rounded-circle p-3 d-inline-flex align-items-center justify-content-center mb-3 shadow-sm" style="background: linear-gradient(135deg, rgba(99, 102, 241, 0.15), rgba(139, 92, 246, 0.2)); width: 56px; height: 56px; border: 1px solid rgba(99, 102, 241, 0.3);">
+                    <i class="fas fa-sparkles text-primary fa-lg"></i>
+                </div>
+                <h5 class="fw-bold text-white mb-1" style="font-size: 1.1rem;">AI Study Assistant</h5>
+                <div class="text-primary fw-semibold small mb-2" style="font-size: 0.82rem;">Learn smarter with AI</div>
+                <p class="small text-white-50 mb-4" style="max-width: 290px; margin: 0 auto; font-size: 0.82rem; line-height: 1.45;">
+                    Ask questions about your study materials. I'll help you understand concepts, explain difficult topics, and learn more effectively.
+                </p>
+
+                <div class="d-flex flex-column gap-2 text-start" style="max-width: 320px; margin: 0 auto;">
+                    <div class="text-muted text-uppercase font-monospace text-center mb-1" style="font-size: 0.68rem; letter-spacing: 0.05em;">Suggested prompts</div>
+                    
+                    <button type="button" class="btn btn-sm btn-dark border border-secondary text-light text-start py-2 px-3 fw-normal d-flex align-items-center gap-2" style="font-size: 0.8rem; border-radius: 10px; background: #1e293b; transition: all 0.2s ease;" onclick="useSamplePrompt('Explain this topic in simple terms')">
+                        <i class="fas fa-lightbulb text-warning opacity-75"></i>
+                        <span>Explain this topic in simple terms</span>
+                    </button>
+
+                    <button type="button" class="btn btn-sm btn-dark border border-secondary text-light text-start py-2 px-3 fw-normal d-flex align-items-center gap-2" style="font-size: 0.8rem; border-radius: 10px; background: #1e293b; transition: all 0.2s ease;" onclick="useSamplePrompt('Summarize my study material')">
+                        <i class="fas fa-compress-alt text-info opacity-75"></i>
+                        <span>Summarize my study material</span>
+                    </button>
+
+                    <button type="button" class="btn btn-sm btn-dark border border-secondary text-light text-start py-2 px-3 fw-normal d-flex align-items-center gap-2" style="font-size: 0.8rem; border-radius: 10px; background: #1e293b; transition: all 0.2s ease;" onclick="useSamplePrompt('Give me an example')">
+                        <i class="fas fa-search text-success opacity-75"></i>
+                        <span>Give me an example</span>
+                    </button>
+
+                    <button type="button" class="btn btn-sm btn-dark border border-secondary text-light text-start py-2 px-3 fw-normal d-flex align-items-center gap-2" style="font-size: 0.8rem; border-radius: 10px; background: #1e293b; transition: all 0.2s ease;" onclick="useSamplePrompt('Create practice questions')">
+                        <i class="fas fa-question-circle text-primary opacity-75"></i>
+                        <span>Create practice questions</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Loading Indicator -->
+        <div id="rag-chat-loading" class="d-none text-center py-2 flex-shrink-0" style="background: #0f172a;">
+            <div class="spinner-border spinner-border-sm text-primary me-2" role="status"></div>
+            <span class="small text-muted">Searching study materials &amp; generating answer...</span>
+        </div>
+
+        <!-- Fixed Input Composer -->
+        <div class="p-3 border-top border-secondary flex-shrink-0" style="background: #1e293b;">
+            <form id="rag-chat-form" onsubmit="handleRagChatSubmit(event);">
+                <div class="input-group bg-dark rounded-3 border border-secondary p-1">
+                    <input type="text" id="rag-chat-input" class="form-control bg-transparent text-white border-0 shadow-none px-3" placeholder="Ask your AI tutor anything..." required autocomplete="off" style="font-size: 0.88rem;">
+                    <button type="submit" class="btn btn-primary rounded-3 px-3 fw-bold shadow-sm d-flex align-items-center gap-1" id="rag-chat-send-btn" style="background: linear-gradient(135deg, #6366f1, #8b5cf6); border: none;">
+                        <i class="fas fa-paper-plane" style="font-size: 0.85rem;"></i>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+function escapeHtml(text) {
+    if (!text) return '';
+    return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+}
+
+function useSamplePrompt(text) {
+    const input = document.getElementById("rag-chat-input");
+    if (input) {
+        input.value = text.replace(/^"|"$/g, '').trim();
+        input.focus();
+    }
+}
+
+document.addEventListener("DOMContentLoaded", function() {
+    const drawerEl = document.getElementById("ragChatOffcanvas");
+    const fabContainer = document.getElementById("rag-chat-fab-container");
+    if (drawerEl && fabContainer) {
+        drawerEl.addEventListener("show.bs.offcanvas", function() {
+            fabContainer.style.opacity = "0";
+            fabContainer.style.pointerEvents = "none";
+        });
+        drawerEl.addEventListener("hidden.bs.offcanvas", function() {
+            fabContainer.style.opacity = "1";
+            fabContainer.style.pointerEvents = "auto";
+        });
+    }
+});
+
+async function handleRagChatSubmit(e) {
+    e.preventDefault();
+    const input = document.getElementById("rag-chat-input");
+    const subjIdInput = document.getElementById("rag-active-subject-id");
+    const msgContainer = document.getElementById("rag-chat-messages");
+    const loading = document.getElementById("rag-chat-loading");
+    const sendBtn = document.getElementById("rag-chat-send-btn");
+
+    const message = input.value.trim();
+    const subjectId = subjIdInput ? subjIdInput.value : null;
+
+    if (!message || !subjectId) return;
+
+    // Remove empty state placeholder if present
+    const emptyState = document.getElementById("rag-chat-empty-state");
+    if (emptyState) {
+        emptyState.remove();
+    }
+
+    // Append user message bubble (aligned right)
+    const userWrapper = document.createElement("div");
+    userWrapper.className = "d-flex justify-content-end mb-2";
+    userWrapper.innerHTML = `
+        <div class="p-2 px-3 rounded-3 text-white text-break" style="max-width: 82%; font-size: 0.88rem; background: linear-gradient(135deg, #4f46e5, #6366f1); box-shadow: 0 4px 14px rgba(79, 70, 229, 0.3);">
+            ${escapeHtml(message)}
+        </div>
+    `;
+    msgContainer.appendChild(userWrapper);
+
+    input.value = "";
+    input.disabled = true;
+    sendBtn.disabled = true;
+    loading.classList.remove("d-none");
+    msgContainer.scrollTop = msgContainer.scrollHeight;
+
+    try {
+        const response = await fetch("/student/api/rag/chat", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ message: message, subject_id: parseInt(subjectId) })
+        });
+        const data = await response.json();
+
+        loading.classList.add("d-none");
+        input.disabled = false;
+        sendBtn.disabled = false;
+
+        const aiWrapper = document.createElement("div");
+        aiWrapper.className = "d-flex align-items-start gap-2 mb-2";
+
+        if (data.status === "success") {
+            if (data.grounded) {
+                let sourcesHtml = '';
+                if (data.sources && data.sources.length > 0) {
+                    sourcesHtml += `<div class="mt-2 pt-2 border-top border-secondary text-muted" style="font-size:0.72rem;">`;
+                    sourcesHtml += `<div class="text-success mb-1 fw-semibold"><i class="fas fa-check-circle me-1"></i>Grounded in your study materials</div>`;
+                    sourcesHtml += `<div class="d-flex flex-wrap gap-1 mt-1">`;
+                    data.sources.forEach(s => {
+                        sourcesHtml += `<span class="badge bg-dark border border-secondary text-light fw-normal text-truncate" style="max-width: 220px; font-size: 0.7rem;">📄 ${escapeHtml(s.filename)}${s.chapter_title ? ' • 📖 ' + escapeHtml(s.chapter_title) : ''}</span>`;
+                    });
+                    sourcesHtml += `</div></div>`;
+                }
+                aiWrapper.innerHTML = `
+                    <div class="rounded-circle p-2 flex-shrink-0 d-flex align-items-center justify-content-center shadow-sm" style="background: linear-gradient(135deg, #6366f1, #8b5cf6); width: 32px; height: 32px;">
+                        <i class="fas fa-sparkles text-white" style="font-size: 0.78rem;"></i>
+                    </div>
+                    <div class="p-3 rounded-3 border border-secondary text-white text-break" style="max-width: 88%; font-size: 0.88rem; background: #1e293b; line-height: 1.5;">
+                        <div>${escapeHtml(data.answer).replace(/\n/g, '<br>')}</div>
+                        ${sourcesHtml}
+                    </div>
+                `;
+            } else {
+                aiWrapper.innerHTML = `
+                    <div class="rounded-circle bg-warning bg-opacity-20 text-warning p-2 flex-shrink-0 d-flex align-items-center justify-content-center" style="width: 32px; height: 32px;">
+                        <i class="fas fa-exclamation-triangle text-warning" style="font-size: 0.85rem;"></i>
+                    </div>
+                    <div class="p-3 rounded-3 border border-secondary text-white-50 text-break" style="max-width: 88%; font-size: 0.88rem; background: #1e293b; line-height: 1.5;">
+                        <div>${escapeHtml(data.answer)}</div>
+                    </div>
+                `;
+            }
+        } else {
+            aiWrapper.innerHTML = `
+                <div class="rounded-circle bg-danger bg-opacity-20 text-danger p-2 flex-shrink-0 d-flex align-items-center justify-content-center" style="width: 32px; height: 32px;">
+                    <i class="fas fa-times-circle text-danger" style="font-size: 0.85rem;"></i>
+                </div>
+                <div class="p-3 rounded-3 border border-danger text-danger text-break" style="max-width: 88%; font-size: 0.88rem; background: #1e293b; line-height: 1.5;">
+                    <div>${escapeHtml(data.message || 'Error fetching answer.')}</div>
+                </div>
+            `;
+        }
+
+        msgContainer.appendChild(aiWrapper);
+        msgContainer.scrollTop = msgContainer.scrollHeight;
+    } catch (err) {
+        loading.classList.add("d-none");
+        input.disabled = false;
+        sendBtn.disabled = false;
+
+        const errWrapper = document.createElement("div");
+        errWrapper.className = "d-flex align-items-start gap-2 mb-2";
+        errWrapper.innerHTML = `
+            <div class="p-2 px-3 rounded-3 bg-danger text-white me-auto small">
+                Connection error. Please try again.
+            </div>
+        `;
+        msgContainer.appendChild(errWrapper);
+        msgContainer.scrollTop = msgContainer.scrollHeight;
+    }
+}
+</script>
+</div>
+{% endblock %}

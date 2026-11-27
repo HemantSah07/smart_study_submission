@@ -1,0 +1,84 @@
+{% extends 'admin/admin_base.html' %}
+{% block title %}Chapter Browser — Content Management{% endblock %}
+
+{% block breadcrumb_items %}
+    <a href="{{ url_for('admin.content_stats') }}">Content</a>
+    <span class="sep"><i class="fas fa-chevron-right"></i></span>
+    <span class="active-item">Chapters</span>
+{% endblock %}
+
+{% block admin_content %}
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+    <div>
+        <h1 class="h3 fw-bold text-white mb-1"><i class="fas fa-layer-group me-2 text-primary"></i> Chapter Browser</h1>
+        <p class="text-muted small mb-0">Navigate curriculum chapters by subject and inspect topic breakdown.</p>
+    </div>
+    <div class="d-flex gap-2">
+        <a href="{{ url_for('admin.content_stats') }}" class="btn btn-admin btn-admin-secondary btn-admin-sm">
+            <i class="fas fa-chart-pie me-1"></i> Content Overview
+        </a>
+    </div>
+</div>
+
+<!-- Subject Picker -->
+<div class="admin-card p-3 mb-4">
+    <form method="GET" action="{{ url_for('admin.content_chapters') }}" class="row g-2 align-items-center">
+        <div class="col-12 col-md-6">
+            <label class="form-label text-muted small fw-semibold mb-1"><i class="fas fa-filter text-primary me-1"></i> Select Academic Subject</label>
+            <select name="subject_id" class="form-select admin-form-control">
+                <option value="">-- Choose Subject to Load Chapters --</option>
+                {% for s in subjects %}
+                <option value="{{ s.id }}" {% if s.id == subject_id %}selected{% endif %}>{{ s.name }} ({{ s.level_of_study or 'General' }})</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-12 col-md-3 align-self-end">
+            <button type="submit" class="btn btn-admin btn-admin-primary btn-admin-sm w-100 justify-content-center">
+                <i class="fas fa-layer-group me-1"></i> Load Chapters
+            </button>
+        </div>
+    </form>
+</div>
+
+<!-- Chapters Table -->
+{% if chapters %}
+<div class="admin-table-container">
+    <table class="admin-table">
+        <thead>
+            <tr>
+                <th class="ps-4" style="width: 100px;">Chapter #</th>
+                <th>Chapter Name</th>
+                <th>Subject Context</th>
+                <th class="pe-4 text-end">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for c in chapters %}
+            <tr>
+                <td class="ps-4">
+                    <span class="badge bg-primary-subtle text-primary border border-primary-subtle px-2 py-1 font-mono fw-bold">CH {{ c.chapter_number }}</span>
+                </td>
+                <td class="fw-bold text-white fs-6">{{ c.name }}</td>
+                <td class="small text-muted">{{ c.subject.name if c.subject else 'Unassigned' }}</td>
+                <td class="pe-4 text-end">
+                    <a href="{{ url_for('admin.content_chapter_topics', subject_id=c.subject_id) }}" class="btn btn-admin btn-admin-secondary btn-admin-sm">
+                        <i class="fas fa-list-ol me-1"></i> View Topics
+                    </a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% elif subject_id %}
+<div class="admin-card p-5 text-center text-muted">
+    <i class="fas fa-folder-open fs-2 text-dim mb-2 d-block"></i>
+    <p class="mb-0">No chapters configured for this subject yet.</p>
+</div>
+{% else %}
+<div class="admin-card p-5 text-center text-muted">
+    <i class="fas fa-layer-group fs-2 text-dim mb-2 d-block"></i>
+    <p class="mb-0">Select an academic subject above to browse its chapters.</p>
+</div>
+{% endif %}
+{% endblock %}

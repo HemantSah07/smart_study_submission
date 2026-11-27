@@ -1,0 +1,946 @@
+{% extends 'base.html' %}
+{% block title %}My Profile · Academic Identity{% endblock %}
+
+{% block breadcrumbs %}
+<span class="sep"><i class="fas fa-chevron-right"></i></span>
+<span>Account</span>
+<span class="sep"><i class="fas fa-chevron-right"></i></span>
+<span class="current">Academic Identity</span>
+{% endblock %}
+
+{% block content %}
+<div class="ss-page px-2 py-3">
+<!-- ── Academic Identity Hero ── -->
+<section class="ss-page-hero position-relative overflow-hidden mb-4">
+    <div class="ss-page-hero-bg" style="background-image: url('{{ url_for('static', filename='img/ui/student/profile.webp') }}');"></div>
+    <div class="ss-page-hero-content py-3">
+        <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
+            <div class="d-flex align-items-center gap-3">
+                {% if profile.profile_pic %}
+                <img src="{{ url_for('static', filename=profile.profile_pic) }}" alt="Profile Pic" class="rounded-circle border border-2 border-primary shadow-sm" style="width: 72px; height: 72px; object-fit: cover;">
+                {% else %}
+                <div class="rounded-circle border border-2 border-primary shadow-sm bg-dark d-flex align-items-center justify-content-center text-primary fw-bold fs-3" style="width: 72px; height: 72px;">
+                    {{ (user.full_name or 'S')[0].upper() }}
+                </div>
+                {% endif %}
+                <div>
+                    <div class="ss-badge ss-badge-cyan mb-1">
+                        <i class="fas fa-id-card me-1"></i> {{ profile.student_number or 'Student Account' }}
+                    </div>
+                    <h1 class="display-6 fw-bold text-white mb-0" style="letter-spacing: -0.02em;">
+                        {{ user.full_name or user.username }}
+                    </h1>
+                    <p class="text-muted mb-0" style="font-size: 0.95rem;">
+                        <i class="far fa-envelope me-1"></i> {{ user.email }} · {{ profile.study_level or 'Level Not Set' }}
+                    </p>
+                </div>
+            </div>
+            <div class="d-flex gap-2">
+                <span class="ss-badge ss-badge-emerald py-2 px-3"><i class="fas fa-fire me-1"></i> {{ streak }} Day Streak</span>
+                <span class="ss-badge {% if risk_summary == 'high' %}ss-badge-rose{% elif risk_summary == 'medium' %}ss-badge-amber{% else %}ss-badge-emerald{% endif %} py-2 px-3">
+                    <i class="fas fa-shield-alt me-1"></i> Risk: {{ risk_summary|upper }}
+                </span>
+            </div>
+        </div>
+    </div>
+</section>
+
+
+    <!-- Quick Stats Grid -->
+    <div class="col-12 stagger-2">
+        <div class="row g-3">
+            <div class="col-6 col-md-3">
+                <div class="card card-flat p-3 text-center h-100">
+                    <div class="text-muted small fw-bold mb-1">LOGGED HOURS</div>
+                    <div class="stat-value text-gradient">{{ "%.1f"|format(logged_hours or 0.0) }} hrs</div>
+                </div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="card card-flat p-3 text-center h-100">
+                    <div class="text-muted small fw-bold mb-1">QUIZZES TAKEN</div>
+                    <div class="stat-value text-gradient">{{ completed_quizzes_count }}</div>
+                </div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="card card-flat p-3 text-center h-100">
+                    <div class="text-muted small fw-bold mb-1">LESSONS DONE</div>
+                    <div class="stat-value text-gradient">{{ completed_lessons_count }}</div>
+                </div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="card card-flat p-3 text-center h-100">
+                    <div class="text-muted small fw-bold mb-1">GPA / SCORE</div>
+                    <div class="stat-value text-gradient">{{ "%.2f"|format(profile.cumulative_gpa or 0.0) }}</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% if edit_mode %}
+    <!-- EDIT MODE FORM -->
+    <div class="col-lg-12 stagger-3">
+        <div class="card card-light p-4">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h5 class="fw-bold text-white mb-0"><i class="fas fa-edit text-primary me-2"></i> Edit Profile Details</h5>
+                <form method="POST" action="{{ url_for('student.profile') }}" style="display:inline;">
+                    <input type="hidden" name="action" value="cancel">
+                    <button type="submit" class="btn btn-outline-secondary btn-sm">
+                        <i class="fas fa-times me-1"></i> Cancel
+                    </button>
+                </form>
+            </div>
+            
+            <form method="POST" enctype="multipart/form-data" id="profileForm" action="{{ url_for('student.profile') }}">
+                <input type="hidden" name="action" value="save">
+                <!-- Personal -->
+                <div class="row g-3 mb-4">
+                    <div class="col-md-6">
+                        <label class="form-label text-muted small">Full Name</label>
+                        <input type="text" name="full_name" class="form-control bg-dark border-secondary text-white" value="{{ user.full_name }}" required>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label text-muted small">Upload Profile Picture</label>
+                        <input type="file" name="profile_pic" class="form-control bg-dark border-secondary text-white" accept=".jpg,.jpeg,.png">
+                    </div>
+                </div>
+
+                <hr class="border-secondary mb-4">
+
+                <!-- Education -->
+                <h6 class="fw-bold text-white mb-3"><i class="fas fa-graduation-cap text-primary me-2"></i> Educational Setting</h6>
+                <div class="row g-3 mb-4">
+                    <!-- Country -->
+                    <div class="col-md-6">
+                        <label class="form-label text-muted small">Country <span class="text-danger">*</span></label>
+                        <select name="country" id="countrySelect" class="form-select border-secondary bg-dark text-white" required>
+                            <option value="">-- Select Country --</option>
+                            {% set countries = [
+                                'Nepal','United States','United Kingdom','South Korea','China',
+                                'Germany','Australia','Canada','Japan','Switzerland','Singapore',
+                                'Finland','Netherlands','Sweden','Denmark','Norway','Ireland',
+                                'Belgium','France','Italy','India'
+                            ] %}
+                            {% for c in countries %}
+                            <option value="{{ c }}" {% if profile.country == c %}selected{% endif %}>{{ c }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <!-- Class / Study Level -->
+                    <div class="col-md-6">
+                        <label class="form-label text-muted small">Class / Study Level <span class="text-danger">*</span></label>
+                        <select name="study_level" id="studyLevelSelect" class="form-select border-secondary bg-dark text-white" required>
+                            <option value="">-- Select Level --</option>
+                        </select>
+                    </div>
+
+                    <div class="col-md-6" id="timezoneGroup" style="display:none;">
+                        <label class="form-label text-muted small">Timezone <span class="text-danger">*</span></label>
+                        <select id="timezoneSelect" class="form-select border-secondary bg-dark text-white">
+                            <option value="{{ profile.timezone or 'Asia/Kathmandu' }}" selected>{{ profile.timezone or 'Asia/Kathmandu' }}</option>
+                        </select>
+                    </div>
+                    <input type="hidden" name="timezone" id="timezoneHidden" value="{{ profile.timezone or 'Asia/Kathmandu' }}">
+
+                    <!-- Faculty (shown only for Class 11 / Class 12 / Bachelors / Masters) -->
+                    <div class="col-md-6" id="facultyGroup" style="display:none;">
+                        <label class="form-label text-muted small" id="facultyLabel">Faculty <span class="text-danger">*</span></label>
+                        <select name="program" id="facultySelect" class="form-select border-secondary bg-dark text-white">
+                            <option value="">-- Select Faculty --</option>
+                        </select>
+                    </div>
+
+                    <!-- Program Duration (shown only when program requires it, e.g. BSc IT) -->
+                    <div class="col-md-6" id="programDurationGroup" style="display:none;">
+                        <label class="form-label text-muted small">Program Duration <span class="text-danger">*</span></label>
+                        <select name="program_duration" id="programDurationSelect" class="form-select border-secondary bg-dark text-white">
+                            <option value="">-- Select Duration --</option>
+                        </select>
+                        <div class="form-text text-muted small">3 Years = APU/international-affiliated (e.g. LBEF); 4 Years = TU-affiliated.</div>
+                    </div>
+
+                    <!-- Semester / Academic Term (Bachelors / Masters only) -->
+                    <!-- Options are populated dynamically by JS based on program duration -->
+                    <div class="col-md-6" id="semesterGroup" style="display:none;">
+                        <label class="form-label text-muted small">Semester / Academic Term</label>
+                        <select name="semester" id="semesterSelect" class="form-select border-secondary bg-dark text-white">
+                            <option value="">-- Select Term --</option>
+                        </select>
+                    </div>
+
+                    <!-- University Type (Bachelors / Masters only) -->
+                    <div class="col-md-6" id="universityTypeGroup" style="display:none;">
+                        <label class="form-label text-muted small">University Type <span class="text-danger">*</span></label>
+                        <select name="university_type" id="universityTypeSelect" class="form-select border-secondary bg-dark text-white">
+                            <option value="">-- Select Type --</option>
+                            <option value="National" {% if profile.university_type == 'National' %}selected{% endif %}>National University</option>
+                            <option value="Foreign" {% if profile.university_type == 'Foreign' %}selected{% endif %}>Foreign University</option>
+                        </select>
+                    </div>
+
+                    <!-- University (National selection, Bachelors / Masters only) -->
+                    <div class="col-md-6" id="universityGroup" style="display:none;">
+                        <label class="form-label text-muted small">University <span class="text-danger">*</span></label>
+                        <select name="university_select" id="universitySelect" class="form-select border-secondary bg-dark text-white">
+                            <option value="">-- Select University --</option>
+                            {% for uni in active_universities %}
+                            <option value="{{ uni.name }}" {% if profile.university == uni.name and profile.university_type != 'Foreign' %}selected{% endif %}>{{ uni.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <!-- University Custom/Follow-up (shown when Foreign-Affiliated or Other selected) -->
+                    <div class="col-md-6" id="universityCustomGroup" style="display:none;">
+                        <label class="form-label text-muted small" id="universityCustomLabel">Specify institution <span class="text-danger">*</span></label>
+                        <input type="text" name="university_custom" id="universityCustomInput" class="form-control bg-dark border-secondary text-white" placeholder="Enter institution name">
+                    </div>
+
+                    <!-- University Country (Foreign selection, Bachelors / Masters only) -->
+                    <div class="col-md-6" id="foreignUniversityCountryGroup" style="display:none;">
+                        <label class="form-label text-muted small">University Country <span class="text-danger">*</span></label>
+                        <select name="university_country" id="universityCountrySelect" class="form-select border-secondary bg-dark text-white">
+                            <option value="">-- Select Country --</option>
+                        </select>
+                    </div>
+
+                    <!-- Foreign University Selection (Bachelors / Masters only) -->
+                    <div class="col-md-6" id="foreignUniversityGroup" style="display:none;">
+                        <label class="form-label text-muted small">Foreign University <span class="text-danger">*</span></label>
+                        <select name="foreign_university" id="foreignUniversitySelect" class="form-select border-secondary bg-dark text-white">
+                            <option value="">-- Select Country First --</option>
+                        </select>
+                    </div>
+                </div>
+
+                <hr class="border-secondary mb-4">
+
+                <!-- Academic Info -->
+                <h6 class="fw-bold text-white mb-3"><i class="fas fa-chart-bar text-primary me-2"></i> Academic Info</h6>
+                <div class="row g-3 mb-4">
+                    <div class="col-md-4">
+                        <label class="form-label text-muted small" id="gradeLabel">Previous GPA <span class="text-danger">*</span> <span class="text-muted">(0 – 4 scale)</span></label>
+                        <input type="number" name="cumulative_gpa" id="gradeInput" class="form-control bg-dark border-secondary text-white" value="{{ profile.cumulative_gpa }}" step="0.01" min="0" max="4" required>
+                        <div class="form-text text-muted small" id="gradeHint">
+                            Enter your GPA (0.00 – 4.00). &nbsp;<span id="gpaPercent" class="text-primary fw-semibold">{% if profile.cumulative_gpa %}≈ {{ "%.1f"|format(profile.cumulative_gpa * 25) }}%{% endif %}</span>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label text-muted small">Attendance % <span class="text-danger">*</span></label>
+                        <input type="number" name="attendance_pct" class="form-control bg-dark border-secondary text-white" value="{{ profile.attendance_pct or 85 }}" step="1" min="0" max="100" required>
+                        <div class="form-text text-muted small">Your actual class attendance percentage (0–100).</div>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label text-muted small">Commute Buffer (minutes)</label>
+                        <input type="number" name="commute_buffer_minutes" class="form-control bg-dark border-secondary text-white" value="{{ profile.commute_buffer_minutes or 0 }}" min="0" max="180" step="5">
+                        <div class="form-text text-muted small">Added before and after Class/Academic and Work blocks.</div>
+                    </div>
+                </div>
+
+                <!-- Tutor Preferences -->
+                <h6 class="fw-bold text-white mb-3"><i class="fas fa-robot text-primary me-2"></i> AI Academic Tutor Preferences</h6>
+
+                <div class="alert d-flex align-items-start gap-2 mb-3 py-2 px-3" style="background:rgba(99,102,241,0.12);border:1px solid rgba(99,102,241,0.35);border-radius:10px;">
+                    <i class="fas fa-magic text-primary mt-1" style="font-size:0.9rem;"></i>
+                    <div class="small text-muted lh-sm">
+                        <strong class="text-white">Quiz difficulty, response length &amp; learning style</strong> are now
+                        auto-adapted by the system based on your ML risk score and assessment performance.
+                        Only set your fixed preferences below.
+                    </div>
+                </div>
+
+                <div class="row g-3 mb-4">
+                    <div class="col-md-6">
+                        <label class="form-label text-muted small">Explanation Level</label>
+                        <select name="explanation_level" class="form-select border-secondary bg-dark text-white">
+                            <option value="Beginner" {% if profile.explanation_level == 'Beginner' %}selected{% endif %}>Beginner</option>
+                            <option value="Intermediate" {% if profile.explanation_level == 'Intermediate' or not profile.explanation_level %}selected{% endif %}>Intermediate</option>
+                            <option value="Advanced" {% if profile.explanation_level == 'Advanced' %}selected{% endif %}>Advanced</option>
+                            <option value="Master" {% if profile.explanation_level == 'Master' %}selected{% endif %}>Master / Professional</option>
+                        </select>
+                    </div>
+
+                    <div class="col-md-6">
+                        <label class="form-label text-muted small">Study Goal</label>
+                        <select name="study_goal" class="form-select border-secondary bg-dark text-white">
+                            <option value="Pass Exams" {% if profile.study_goal == 'Pass Exams' %}selected{% endif %}>Pass Exams</option>
+                            <option value="Improve Grades" {% if profile.study_goal == 'Improve Grades' or not profile.study_goal %}selected{% endif %}>Improve Grades</option>
+                            <option value="Master Subject" {% if profile.study_goal == 'Master Subject' %}selected{% endif %}>Master Subject</option>
+                            <option value="Competitive Exams" {% if profile.study_goal == 'Competitive Exams' %}selected{% endif %}>Competitive Exams</option>
+                        </select>
+                    </div>
+
+                    <div class="col-md-6">
+                        <label class="form-label text-muted small">Peak Focus Time</label>
+                        <select name="peak_focus_time" class="form-select border-secondary bg-dark text-white">
+                            <option value="Morning" {% if profile.peak_focus_time == 'Morning' or not profile.peak_focus_time %}selected{% endif %}>Morning</option>
+                            <option value="Afternoon" {% if profile.peak_focus_time == 'Afternoon' %}selected{% endif %}>Afternoon</option>
+                            <option value="Evening" {% if profile.peak_focus_time == 'Evening' %}selected{% endif %}>Evening</option>
+                            <option value="Night" {% if profile.peak_focus_time == 'Night' %}selected{% endif %}>Night</option>
+                        </select>
+                        <div class="form-text text-muted small">When are you most focused and able to concentrate? The planner prioritizes your harder subjects during this window.</div>
+                    </div>
+
+                    <div class="col-md-6">
+                        <label class="form-label text-muted small">Preferred Language</label>
+                        <select name="preferred_language" class="form-select border-secondary bg-dark text-white">
+                            <option value="English" {% if profile.preferred_language == 'English' or not profile.preferred_language %}selected{% endif %}>English</option>
+                            <option value="Nepali" {% if profile.preferred_language == 'Nepali' %}selected{% endif %}>Nepali</option>
+                            <option value="Bilingual" {% if profile.preferred_language == 'Bilingual' %}selected{% endif %}>Bilingual (English + Nepali)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="d-flex gap-3">
+                    <button type="submit" class="btn btn-primary btn-glow flex-grow-1 py-3">
+                        <i class="fas fa-save me-2"></i> Save Profile Details
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+    {% else %}
+    <!-- READ-ONLY AI INSIGHTS DASHBOARD -->
+    <!-- Column 1: Academic Settings & Mastery Matrix -->
+    <div class="col-lg-7 stagger-3">
+        <!-- Curriculum Settings Panel -->
+        <div class="card card-flat p-4 mb-4">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="fw-bold text-white mb-0"><i class="fas fa-graduation-cap text-primary me-2"></i> Curriculum &amp; Academic Settings</h5>
+                <a href="{{ url_for('student.profile', edit='1') }}" class="btn btn-outline-primary btn-sm">
+                    <i class="fas fa-edit me-1"></i> Edit Profile
+                </a>
+            </div>
+            
+            <div class="row g-3 small">
+                <div class="col-6 col-md-4">
+                    <span class="text-muted d-block">Country</span>
+                    <span class="fw-semibold text-white">{{ profile.country or 'Nepal' }}</span>
+                </div>
+                <div class="col-6 col-md-4">
+                    <span class="text-muted d-block">Academic Board</span>
+                    <span class="fw-semibold text-white">{{ profile.curriculum or 'National' }}</span>
+                </div>
+                <div class="col-6 col-md-4">
+                    <span class="text-muted d-block">Class / Level</span>
+                    <span class="fw-semibold text-white">{{ profile.study_level or 'Not set' }}</span>
+                </div>
+                {% if profile.program %}
+                <div class="col-6 col-md-4">
+                    <span class="text-muted d-block">Faculty / Program</span>
+                    <span class="fw-semibold text-white">{{ profile.program }}</span>
+                </div>
+                {% endif %}
+                {% if profile.program_duration %}
+                <div class="col-6 col-md-4">
+                    <span class="text-muted d-block">Program Duration</span>
+                    <span class="fw-semibold text-white">{{ profile.program_duration }}</span>
+                </div>
+                {% endif %}
+                {% if profile.semester %}
+                <div class="col-6 col-md-4">
+                    <span class="text-muted d-block">Semester</span>
+                    <span class="fw-semibold text-white">{{ profile.semester }}</span>
+                </div>
+                {% endif %}
+                {% if profile.study_level in ("Bachelors", "Masters") %}
+                    {% if profile.university_type %}
+                    <div class="col-6 col-md-4">
+                        <span class="text-muted d-block">University Type</span>
+                        <span class="fw-semibold text-white">{{ profile.university_type }} University</span>
+                    </div>
+                    {% endif %}
+                    {% if profile.university_type == "Foreign" and profile.university_country %}
+                    <div class="col-6 col-md-4">
+                        <span class="text-muted d-block">University Country</span>
+                        <span class="fw-semibold text-white">{{ profile.university_country }}</span>
+                    </div>
+                    {% endif %}
+                {% endif %}
+                {% if profile.university %}
+                <div class="col-6 col-md-4">
+                    <span class="text-muted d-block">University</span>
+                    <span class="fw-semibold text-white">
+                        {% if profile.university.startswith("Foreign-Affiliated: ") %}
+                            {{ profile.university[20:] }} (Foreign-Affiliated)
+                        {% elif profile.university.startswith("Other: ") %}
+                            {{ profile.university[7:] }}
+                        {% else %}
+                            {{ profile.university }}
+                        {% endif %}
+                    </span>
+                </div>
+                {% endif %}
+                <div class="col-6 col-md-4">
+                    <span class="text-muted d-block">Previous Grade GPA</span>
+                    <span class="fw-semibold text-white">{{ "%.2f"|format(profile.cumulative_gpa or 0.0) }} / 4.00</span>
+                </div>
+                <div class="col-6 col-md-4">
+                    <span class="text-muted d-block">Timezone</span>
+                    <span class="fw-semibold text-white">{{ profile.timezone or 'Asia/Kathmandu' }}</span>
+                </div>
+                <div class="col-6 col-md-4">
+                    <span class="text-muted d-block">Commute Buffer</span>
+                    <span class="fw-semibold text-white">{{ profile.commute_buffer_minutes or 0 }} minutes</span>
+                </div>
+                <div class="col-6 col-md-4">
+                    <span class="text-muted d-block">Target Score Goal</span>
+                    <span class="badge bg-purple text-white">{{ profile.target_score_goal or 70.0 }}%</span>
+                </div>
+                <div class="col-6 col-md-4">
+                    <span class="text-muted d-block">Peak Focus Time</span>
+                    <span class="badge bg-info text-white">{{ profile.peak_focus_time or 'Morning' }}</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Subject Mastery Matrix -->
+        <div class="card card-flat p-4 mb-4">
+            <h5 class="fw-bold text-white mb-3"><i class="fas fa-layer-group text-primary me-2"></i> Subject Mastery Matrix</h5>
+            <p class="text-muted small mb-4">Demonstrated conceptual understanding computed across marksheets and active recall assessments.</p>
+            
+            {% if subject_mastery %}
+                <div class="d-flex flex-column gap-3">
+                    {% for name, pct in subject_mastery.items() %}
+                    <div>
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <span class="fw-bold text-white small">{{ name }}</span>
+                            <span class="text-gradient fw-bold small">{{ pct }}% Mastery</span>
+                        </div>
+                        <div class="progress" style="height: 8px; background: rgba(255,255,255,0.05);">
+                            <div class="progress-bar bg-gradient" style="width: {{ pct }}%; height: 8px; border-radius: 4px;"></div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div class="text-muted small py-3 text-center">
+                    <i class="fas fa-info-circle me-1"></i> No active subjects. Link subjects to see mastery analytics.
+                </div>
+            {% endif %}
+        </div>
+
+        <!-- Attention Required (Weakest Topics) -->
+        <div class="card card-flat p-4">
+            <h5 class="text-gradient fw-bold mb-3"><i class="fas fa-exclamation-triangle text-danger me-2"></i> Attention Required (Weak Areas)</h5>
+            <p class="text-muted small mb-4">System has identified top three weakest topics based on incorrect quiz and diagnostic answers.</p>
+            
+            <div class="d-flex flex-column gap-3">
+                {% for wt in weak_topics %}
+                <div class="p-3 rounded bg-dark bg-opacity-40 border border-secondary">
+                    <div class="d-flex justify-content-between align-items-start mb-1">
+                        <div>
+                            <span class="fw-bold text-white small d-block">{{ wt.name }}</span>
+                            <small class="text-muted text-uppercase fs-8">{{ wt.subject_name }} &bull; {{ wt.chapter_name }}</small>
+                        </div>
+                        <span class="badge bg-danger bg-opacity-10 text-danger border border-danger">Action Required</span>
+                    </div>
+                </div>
+                {% else %}
+                <div class="text-center py-4 text-muted">
+                    <i class="fas fa-check-circle fa-2x text-success mb-2"></i>
+                    <h6>No Weak Topics Identified</h6>
+                    <p class="small mb-0">Outstanding accuracy across all concept testing checks!</p>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Column 2: Streaks, Consistency, Compact Assessment History -->
+    <div class="col-lg-5 stagger-3">
+        <!-- Consistency Tracker & Streak -->
+        <div class="card card-flat p-4 mb-4">
+            <h5 class="fw-bold text-white mb-4"><i class="fas fa-fire text-gradient me-2"></i> Consistency Tracker</h5>
+            
+            <div class="d-flex align-items-center gap-3 p-3 rounded bg-dark border border-secondary mb-4">
+                <i class="fas fa-fire text-gradient fa-2x"></i>
+                <div>
+                    <h6 class="fw-bold mb-1 text-white">{{ streak }} Day Study Streak</h6>
+                    <p class="text-muted small mb-0">Longest Study Streak: {{ streak }} days.</p>
+                </div>
+            </div>
+
+            <h6 class="fw-bold text-white small mb-3">Academic Summary Statistics</h6>
+            <div class="d-flex flex-column gap-2 small">
+                <div class="d-flex justify-content-between border-bottom border-secondary pb-2">
+                    <span class="text-muted">Strongest Subject:</span>
+                    <span class="fw-semibold text-success">{{ strongest_subject }}</span>
+                </div>
+                <div class="d-flex justify-content-between border-bottom border-secondary pb-2">
+                    <span class="text-muted">Weakest Subject:</span>
+                    <span class="fw-semibold text-danger">{{ weakest_subject }}</span>
+                </div>
+                <div class="d-flex justify-content-between border-bottom border-secondary pb-2">
+                    <span class="text-muted">Academic Overall Score:</span>
+                    <span class="fw-semibold text-white">{{ overall_stats.accuracy }}% Accuracy</span>
+                </div>
+                <div class="d-flex justify-content-between border-bottom border-secondary pb-2">
+                    <span class="text-muted">Overall Mastery Average:</span>
+                    <span class="fw-semibold text-gradient">{{ overall_mastery }}%</span>
+                </div>
+                <div class="d-flex justify-content-between border-bottom border-secondary pb-2">
+                    <span class="text-muted">Academic Trend:</span>
+                    <span class="fw-semibold {% if improvement_trend == 'improving' %}text-success{% elif improvement_trend == 'declining' %}text-danger{% else %}text-muted{% endif %}">
+                        {{ improvement_trend | title }}
+                    </span>
+                </div>
+                <div class="d-flex justify-content-between">
+                    <span class="text-muted">ML Risk Assessment:</span>
+                    <span class="badge {% if risk_summary == 'high' %}bg-danger{% elif risk_summary == 'medium' %}bg-warning text-dark{% else %}bg-success{% endif %}">
+                        {{ risk_summary|upper }} RISK
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Compact Assessment Summary -->
+        <div class="card card-flat p-4">
+            <h5 class="fw-bold text-white mb-3"><i class="fas fa-history text-primary me-2"></i> Recent Assessments</h5>
+            <p class="text-muted small mb-3">Showing all completed diagnostic attempts.</p>
+
+            <div class="d-flex flex-column gap-2 text-center py-2 bg-dark rounded border border-secondary mb-3 small text-muted">
+                <div class="row g-0">
+                    <div class="col-3">
+                        <div class="fs-6 fw-bold text-white">{{ overall_stats.total_attempted }}</div>
+                        <div class="fs-8">Attempted</div>
+                    </div>
+                    <div class="col-3">
+                        <div class="fs-6 fw-bold text-success">{{ overall_stats.correct }}</div>
+                        <div class="fs-8">Correct</div>
+                    </div>
+                    <div class="col-3">
+                        <div class="fs-6 fw-bold text-danger">{{ overall_stats.incorrect }}</div>
+                        <div class="fs-8">Incorrect</div>
+                    </div>
+                    <div class="col-3">
+                        <div class="fs-6 fw-bold text-gradient">{{ overall_stats.accuracy }}%</div>
+                        <div class="fs-8">Accuracy</div>
+                    </div>
+                </div>
+            </div>
+
+            {% if recent_assessments %}
+            <div class="table-responsive mb-3">
+                <table class="table table-dark table-hover border-secondary align-middle small mb-0">
+                    <thead>
+                        <tr class="text-muted">
+                            <th>Subject</th>
+                            <th>Date</th>
+                            <th class="text-end">Score</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for r in recent_assessments %}
+                        <tr>
+                            <td class="fw-bold text-white">{{ r.subject }}</td>
+                            <td>{{ r.date.strftime('%m-%d') }}</td>
+                            <td class="text-end">
+                                <span class="badge bg-purple">{{ r.correct }}/{{ r.total }}</span>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="text-muted py-3 text-center small">
+                <i class="fas fa-info-circle me-1"></i> Complete your first assessment to unlock analytics.
+            </div>
+            {% endif %}
+
+            <a href="{{ url_for('student.assessment_start') }}" class="btn btn-outline-primary w-100 btn-sm mt-2">
+                <i class="fas fa-external-link-alt me-1"></i> View Full History
+            </a>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/profile-fields.js') }}"></script>
+<script>
+// ── Saved profile values from server ────────────────────────────────────────
+const SAVED_COUNTRY          = {{ (profile.country or '') | tojson }};
+const SAVED_STUDY_LEVEL      = {{ (profile.study_level or '') | tojson }};
+const SAVED_PROGRAM          = {{ (profile.program or '') | tojson }};
+const SAVED_PROGRAM_DURATION = {{ (profile.program_duration or '') | tojson }};
+const SAVED_SEMESTER         = {{ (profile.semester or '') | tojson }};
+const SAVED_UNIVERSITY       = {{ (profile.university or '') | tojson }};
+const SAVED_TIMEZONE         = {{ (profile.timezone or 'Asia/Kathmandu') | tojson }};
+const SAVED_UNIVERSITY_TYPE  = {{ (profile.university_type or '') | tojson }};
+const SAVED_UNIVERSITY_COUNTRY = {{ (profile.university_country or '') | tojson }};
+
+// ── Pull shared data arrays from ProfileFields module ─────────────────────
+// (profile-fields.js loaded above exposes window.ProfileFields)
+let LEVEL_OPTIONS          = ProfileFields.LEVEL_OPTIONS;
+let DEFAULT_TIMEZONES      = ProfileFields.DEFAULT_TIMEZONES;
+let MULTI_TIMEZONE_OPTIONS = ProfileFields.MULTI_TIMEZONE_OPTIONS;
+let NEB_GENERAL_FACULTIES  = ProfileFields.NEB_GENERAL_FACULTIES;
+let NEB_TECHNICAL_STREAMS  = ProfileFields.NEB_TECHNICAL_STREAMS;
+let NEPAL_BACHELORS_PROGRAMS = ProfileFields.NEPAL_BACHELORS_PROGRAMS;
+let NEPAL_MASTERS_PROGRAMS = ProfileFields.NEPAL_MASTERS_PROGRAMS;
+let GRADE_LABELS           = ProfileFields.GRADE_LABELS;
+
+// GRADE_LABELS pulled from ProfileFields above
+
+// ── DOM refs ─────────────────────────────────────────────────────────────────
+const countrySelect  = document.getElementById("countrySelect");
+const studyLevelSel  = document.getElementById("studyLevelSelect");
+const facultyGroup   = document.getElementById("facultyGroup");
+const facultyLabel   = document.getElementById("facultyLabel");
+const facultySelect  = document.getElementById("facultySelect");
+const programDurationGroup  = document.getElementById("programDurationGroup");
+const programDurationSelect = document.getElementById("programDurationSelect");
+const semesterGroup  = document.getElementById("semesterGroup");
+const semesterSelect = document.getElementById("semesterSelect");
+
+const universityTypeGroup       = document.getElementById("universityTypeGroup");
+const universityTypeSelect      = document.getElementById("universityTypeSelect");
+const universityGroup           = document.getElementById("universityGroup");
+const universitySelect          = document.getElementById("universitySelect");
+const universityCustomGroup     = document.getElementById("universityCustomGroup");
+const universityCustomLabel     = document.getElementById("universityCustomLabel");
+const universityCustomInput     = document.getElementById("universityCustomInput");
+const foreignUniversityCountryGroup = document.getElementById("foreignUniversityCountryGroup");
+const universityCountrySelect   = document.getElementById("universityCountrySelect");
+const foreignUniversityGroup    = document.getElementById("foreignUniversityGroup");
+const foreignUniversitySelect   = document.getElementById("foreignUniversitySelect");
+
+const timezoneGroup  = document.getElementById("timezoneGroup");
+const timezoneSelect = document.getElementById("timezoneSelect");
+const timezoneHidden = document.getElementById("timezoneHidden");
+const gradeLabelEl   = document.getElementById("gradeLabel");
+const gradeHintEl    = document.getElementById("gradeHint");
+
+function updateTimezoneField(country) {
+    const options = MULTI_TIMEZONE_OPTIONS[country];
+    if (options) {
+        timezoneGroup.style.display = "";
+        timezoneSelect.name = "timezone";
+        timezoneHidden.name = "";
+        timezoneSelect.innerHTML = "";
+        options.forEach(tz => {
+            const o = document.createElement("option");
+            o.value = tz;
+            o.textContent = tz;
+            if (tz === SAVED_TIMEZONE) o.selected = true;
+            timezoneSelect.appendChild(o);
+        });
+        if (!options.includes(SAVED_TIMEZONE)) timezoneSelect.value = options[0];
+    } else {
+        const tz = DEFAULT_TIMEZONES[country] || "UTC";
+        timezoneGroup.style.display = "none";
+        timezoneSelect.name = "";
+        timezoneHidden.name = "timezone";
+        timezoneHidden.value = tz;
+    }
+}
+
+function populateLevels(country, selectedLevel) {
+    updateTimezoneField(country);
+    const opts = LEVEL_OPTIONS[country] || LEVEL_OPTIONS["__default__"];
+    studyLevelSel.innerHTML = '<option value="">-- Select Level --</option>';
+    opts.forEach(lvl => {
+        const o = document.createElement("option");
+        o.value = lvl;
+        o.textContent = lvl;
+        if (lvl === selectedLevel) o.selected = true;
+        studyLevelSel.appendChild(o);
+    });
+    updateConditionalFields(country, selectedLevel || "", SAVED_PROGRAM);
+}
+
+function populateFaculty(country, level, selectedProgram) {
+    facultySelect.innerHTML = '<option value="">-- Select Faculty --</option>';
+
+    let options = [];
+    if (country === "Nepal") {
+        if (level === "Class 11" || level === "Class 12") {
+            // Group: General +2 Faculties
+            const grpGeneral = document.createElement("optgroup");
+            grpGeneral.label = "General +2 Faculties (NEB)";
+            NEB_GENERAL_FACULTIES.forEach(f => {
+                const o = document.createElement("option");
+                o.value = f; o.textContent = f;
+                if (f === selectedProgram) o.selected = true;
+                grpGeneral.appendChild(o);
+            });
+            facultySelect.appendChild(grpGeneral);
+            // Group: Technical/Vocational
+            const grpTech = document.createElement("optgroup");
+            grpTech.label = "Technical & Vocational (NEB/CTEVT)";
+            NEB_TECHNICAL_STREAMS.forEach(f => {
+                const o = document.createElement("option");
+                o.value = f; o.textContent = f;
+                if (f === selectedProgram) o.selected = true;
+                grpTech.appendChild(o);
+            });
+            facultySelect.appendChild(grpTech);
+        } else if (level === "Bachelors") {
+            NEPAL_BACHELORS_PROGRAMS.forEach(f => {
+                const o = document.createElement("option");
+                o.value = f; o.textContent = f;
+                if (f === selectedProgram) o.selected = true;
+                facultySelect.appendChild(o);
+            });
+        } else if (level === "Masters") {
+            NEPAL_MASTERS_PROGRAMS.forEach(f => {
+                const o = document.createElement("option");
+                o.value = f; o.textContent = f;
+                if (f === selectedProgram) o.selected = true;
+                facultySelect.appendChild(o);
+            });
+        }
+    } else {
+        // For non-Nepal countries, a general set of degree types
+        const genericProgs = ["Science","Arts","Commerce","Engineering","Business","Medicine","Law","Education","Technology","Other"];
+        genericProgs.forEach(f => {
+            const o = document.createElement("option");
+            o.value = f; o.textContent = f;
+            if (f === selectedProgram) o.selected = true;
+            facultySelect.appendChild(o);
+        });
+    }
+}
+
+function updateConditionalFields(country, level, savedProg) {
+    const showFaculty  = (["Class 11","Class 12","Bachelors","Masters"].includes(level));
+    const showSemester = (["Bachelors","Masters"].includes(level));
+
+    // Faculty visibility
+    facultyGroup.style.display = showFaculty ? "" : "none";
+    facultySelect.required = showFaculty;
+    if (!showFaculty) {
+        facultySelect.value = "";
+        // Hide duration field when no faculty shown
+        ProfileFields.updateProgramDuration("", programDurationGroup, programDurationSelect, semesterSelect, "", SAVED_SEMESTER);
+    }
+
+    if (showFaculty) {
+        populateFaculty(country, level, savedProg);
+        // Update label
+        if (level === "Bachelors") facultyLabel.innerHTML = 'Program / Faculty <span class="text-danger">*</span>';
+        else if (level === "Masters") facultyLabel.innerHTML = 'Program / Specialisation <span class="text-danger">*</span>';
+        else facultyLabel.innerHTML = 'Faculty <span class="text-danger">*</span>';
+        // Trigger duration update for the current program
+        ProfileFields.updateProgramDuration(
+            savedProg, programDurationGroup, programDurationSelect,
+            semesterSelect, SAVED_PROGRAM_DURATION, SAVED_SEMESTER
+        );
+    }
+
+    // Semester visibility
+    semesterGroup.style.display = showSemester ? "" : "none";
+    if (!showSemester) semesterSelect.value = "";
+
+    // University visibility
+    if (showSemester) {
+        universityTypeGroup.style.display = "";
+        universityTypeSelect.required = true;
+        refreshUniversityTypeFields();
+    } else {
+        universityTypeGroup.style.display = "none";
+        universityTypeSelect.required = false;
+        universityTypeSelect.value = "";
+        refreshUniversityTypeFields();
+    }
+
+    // Grade label
+    if (GRADE_LABELS[level]) {
+        gradeLabelEl.textContent = GRADE_LABELS[level].label;
+        gradeHintEl.textContent  = GRADE_LABELS[level].hint;
+    } else {
+        gradeLabelEl.textContent = "Previous Grade %";
+        gradeHintEl.textContent  = "Enter your most recent overall grade percentage.";
+    }
+}
+
+function refreshUniversityTypeFields() {
+    const type = universityTypeSelect.value;
+    if (universityTypeSelect.required && type === "National") {
+        universityGroup.style.display = "";
+        universitySelect.required = true;
+        
+        universityCustomGroup.style.display = "none";
+        universityCustomInput.required = false;
+        
+        foreignUniversityCountryGroup.style.display = "none";
+        universityCountrySelect.required = false;
+        
+        foreignUniversityGroup.style.display = "none";
+        foreignUniversitySelect.required = false;
+        
+        ProfileFields.refreshUniversityCustom(
+            universitySelect.value, universityCustomGroup, universityCustomInput, universityCustomLabel
+        );
+    } else if (universityTypeSelect.required && type === "Foreign") {
+        universityGroup.style.display = "none";
+        universitySelect.required = false;
+        universitySelect.value = "";
+        
+        universityCustomGroup.style.display = "none";
+        universityCustomInput.required = false;
+        universityCustomInput.value = "";
+        
+        foreignUniversityCountryGroup.style.display = "";
+        universityCountrySelect.required = true;
+        
+        foreignUniversityGroup.style.display = "";
+        foreignUniversitySelect.required = true;
+    } else {
+        universityGroup.style.display = "none";
+        universitySelect.required = false;
+        universitySelect.value = "";
+        
+        universityCustomGroup.style.display = "none";
+        universityCustomInput.required = false;
+        universityCustomInput.value = "";
+        
+        foreignUniversityCountryGroup.style.display = "none";
+        universityCountrySelect.required = false;
+        universityCountrySelect.value = "";
+        
+        foreignUniversityGroup.style.display = "none";
+        foreignUniversitySelect.required = false;
+        foreignUniversitySelect.value = "";
+    }
+}
+
+// ── Event listeners ──────────────────────────────────────────────────────────
+countrySelect.addEventListener("change", function() {
+    populateLevels(this.value, "");
+});
+
+studyLevelSel.addEventListener("change", function() {
+    updateConditionalFields(countrySelect.value, this.value, "");
+});
+
+// Program → show/hide duration field and reset semesters
+if (facultySelect) {
+    facultySelect.addEventListener("change", function() {
+        ProfileFields.updateProgramDuration(
+            this.value, programDurationGroup, programDurationSelect,
+            semesterSelect, "", ""
+        );
+    });
+}
+
+// Duration → refresh semester list
+if (programDurationSelect) {
+    programDurationSelect.addEventListener("change", function() {
+        ProfileFields.onDurationChange(this.value, semesterSelect, "");
+    });
+}
+
+universityTypeSelect.addEventListener("change", function() {
+    refreshUniversityTypeFields();
+});
+
+universityCountrySelect.addEventListener("change", function() {
+    populateForeignUniversities(this.value, "");
+});
+
+function populateForeignUniversities(country, selectedUni) {
+    foreignUniversitySelect.innerHTML = '<option value="">-- Select University --</option>';
+    if (!country) return;
+    const unis = ProfileFields.FOREIGN_UNIVERSITIES[country] || [];
+    unis.forEach(uni => {
+        const o = document.createElement("option");
+        o.value = uni.name;
+        const partnerText = uni.partners && uni.partners.length > 0 ? ` (Partners: ${uni.partners.join(', ')})` : '';
+        o.textContent = uni.name + partnerText;
+        if (uni.name === selectedUni) o.selected = true;
+        foreignUniversitySelect.appendChild(o);
+    });
+}
+
+// University custom toggle (delegates to shared helper)
+if (universitySelect) {
+    universitySelect.addEventListener("change", function() {
+        ProfileFields.refreshUniversityCustom(
+            this.value, universityCustomGroup, universityCustomInput, universityCustomLabel
+        );
+    });
+}
+
+// ── Initialise on page load ──────────────────────────────────────────────────
+document.addEventListener("DOMContentLoaded", function() {
+    ProfileFields.init(function() {
+        // Update local variables from the initialized ProfileFields object
+        LEVEL_OPTIONS          = ProfileFields.LEVEL_OPTIONS;
+        DEFAULT_TIMEZONES      = ProfileFields.DEFAULT_TIMEZONES;
+        MULTI_TIMEZONE_OPTIONS = ProfileFields.MULTI_TIMEZONE_OPTIONS;
+        NEB_GENERAL_FACULTIES  = ProfileFields.NEB_GENERAL_FACULTIES;
+        NEB_TECHNICAL_STREAMS  = ProfileFields.NEB_TECHNICAL_STREAMS;
+        NEPAL_BACHELORS_PROGRAMS = ProfileFields.NEPAL_BACHELORS_PROGRAMS;
+        NEPAL_MASTERS_PROGRAMS = ProfileFields.NEPAL_MASTERS_PROGRAMS;
+        GRADE_LABELS           = ProfileFields.GRADE_LABELS;
+
+        if (SAVED_COUNTRY) {
+            populateLevels(SAVED_COUNTRY, SAVED_STUDY_LEVEL);
+            
+            // Populate foreign countries
+            const foreignCountries = Object.keys(ProfileFields.FOREIGN_UNIVERSITIES || {});
+            universityCountrySelect.innerHTML = '<option value="">-- Select Country --</option>';
+            foreignCountries.forEach(c => {
+                const o = document.createElement("option");
+                o.value = c;
+                o.textContent = c;
+                if (c === SAVED_UNIVERSITY_COUNTRY) o.selected = true;
+                universityCountrySelect.appendChild(o);
+            });
+
+            // Restore university type
+            if (SAVED_UNIVERSITY_TYPE) {
+                universityTypeSelect.value = SAVED_UNIVERSITY_TYPE;
+                refreshUniversityTypeFields();
+                
+                if (SAVED_UNIVERSITY_TYPE === "Foreign") {
+                    populateForeignUniversities(SAVED_UNIVERSITY_COUNTRY, SAVED_UNIVERSITY);
+                } else if (SAVED_UNIVERSITY_TYPE === "National") {
+                    if (SAVED_UNIVERSITY.startsWith("Foreign-Affiliated: ")) {
+                        universitySelect.value = "Foreign-Affiliated";
+                        universityCustomInput.value = SAVED_UNIVERSITY.substring("Foreign-Affiliated: ".length);
+                    } else if (SAVED_UNIVERSITY.startsWith("Other: ")) {
+                        universitySelect.value = "Other";
+                        universityCustomInput.value = SAVED_UNIVERSITY.substring("Other: ".length);
+                    } else {
+                        universitySelect.value = SAVED_UNIVERSITY;
+                    }
+                    ProfileFields.refreshUniversityCustom(
+                        universitySelect.value, universityCustomGroup, universityCustomInput, universityCustomLabel
+                    );
+                }
+            }
+
+            // semester restore (after populateLevels sets visibility)
+            if (SAVED_SEMESTER) {
+                const semOpts = semesterSelect.options;
+                for (let i = 0; i < semOpts.length; i++) {
+                    if (semOpts[i].value === SAVED_SEMESTER) {
+                        semOpts[i].selected = true;
+                        break;
+                    }
+                }
+            }
+            updateConditionalFields(countrySelect.value, studyLevelSel.value, SAVED_PROGRAM);
+        }
+    });
+});
+// ── Live GPA → % conversion hint ─────────────────────────────────────────────
+const gradeInputEl  = document.getElementById('gradeInput');
+const gpaPercentEl  = document.getElementById('gpaPercent');
+if (gradeInputEl && gpaPercentEl) {
+    gradeInputEl.addEventListener('input', function() {
+        const v = parseFloat(this.value);
+        if (!isNaN(v) && v >= 0 && v <= 4) {
+            gpaPercentEl.textContent = '≈ ' + (v * 25).toFixed(1) + '%';
+        } else {
+            gpaPercentEl.textContent = '';
+        }
+    });
+}
+</script>
+</div>
+{% endblock %}
